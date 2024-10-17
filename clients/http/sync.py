@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
-from typing import TYPE_CHECKING, Literal, Union
+from typing import TYPE_CHECKING, Literal
 
 import httpx
 
@@ -10,18 +9,10 @@ from consts import UNSET, Unset
 if TYPE_CHECKING:
     from types import TracebackType
 
-PrimitiveValue = Union[int, float, bool, str, None]
-
-ParamsType = Mapping[str, Union[PrimitiveValue, Sequence[PrimitiveValue]]]
-HeadersType = Mapping[str, str]
-CookiesType = Mapping[str, str]
-
-ContentBodyType = str
-# Represents only variations of the JSON type that the client currently needs.
-JsonBodyType = Union[Mapping[str, any], Sequence[dict[str, any]]]
+    from .types_ import ContentBodyType, CookiesType, HeadersType, JsonBodyType, ParamsType
 
 
-class HttpClient:
+class SyncHttpClient:
     base_url: str | None = None
     base_params: ParamsType | None = None
     base_headers: ParamsType | None = None
@@ -62,7 +53,7 @@ class HttpClient:
         base_headers: HeadersType | None = None,
         cookies: CookiesType | None = None,
         timeout: float | None = None,
-    ) -> HttpClient:
+    ) -> SyncHttpClient:
         cls.base_url = base_url
         cls.base_params = base_params
         cls.base_headers = base_headers
