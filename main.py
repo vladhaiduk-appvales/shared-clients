@@ -5,6 +5,7 @@ import uvicorn
 from fastapi import FastAPI
 
 from clients.http import SyncHttpClient
+from retry import RetryStrategy
 
 
 @asynccontextmanager
@@ -60,6 +61,19 @@ async def sync_local_context_manager_usecase() -> list[dict]:
     # Context manager automatically opens and closes a local httpx client.
     with SyncHttpClient(base_url="https://jsonplaceholder.typicode.com") as client:
         response = client.get("/todos", params={"_limit": 5})
+
+    return response.json()
+
+
+@app.get("/sync/local/retry")
+async def sync_local_retry_usecase() -> list[dict]:
+    with SyncHttpClient(
+        base_url="http://127.0.0.1:5000",
+        timeout=5,
+        # In this case requests will to be retried in case of any exception, including timeouts.
+        retry_strategy=RetryStrategy(attempts=3, delay=1),
+    ) as client:
+        response = client.get(url="/posts")
 
     return response.json()
 

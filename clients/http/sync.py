@@ -9,6 +9,8 @@ from consts import UNSET, Unset
 if TYPE_CHECKING:
     from types import TracebackType
 
+    from retry import RetryStrategy
+
     from .types_ import ContentBodyType, CookiesType, HeadersType, JsonBodyType, ParamsType
 
 
@@ -18,6 +20,7 @@ class SyncHttpClient:
     base_headers: ParamsType | None = None
     cookies: CookiesType | None = None
     timeout: float | None = 5.0
+    retry_strategy: RetryStrategy | None = None
 
     _global_client: httpx.Client | None = None
 
@@ -29,6 +32,7 @@ class SyncHttpClient:
         base_headers: HeadersType | None | Unset = UNSET,
         cookies: CookiesType | None | Unset = UNSET,
         timeout: float | None | Unset = UNSET,
+        retry_strategy: RetryStrategy | None | Unset = UNSET,
     ) -> None:
         # Instance-level attributes do not delete class-level attributes; they simply shadow them.
         if base_url is not UNSET:
@@ -41,6 +45,8 @@ class SyncHttpClient:
             self.cookies = cookies
         if timeout is not UNSET:
             self.timeout = timeout
+        if retry_strategy is not UNSET:
+            self.retry_strategy = retry_strategy
 
         self._local_client: httpx.Client | None = None
 
@@ -53,6 +59,7 @@ class SyncHttpClient:
         base_headers: HeadersType | None | Unset = UNSET,
         cookies: CookiesType | None | Unset = UNSET,
         timeout: float | None | Unset = UNSET,
+        retry_strategy: RetryStrategy | None | Unset = UNSET,
     ) -> SyncHttpClient:
         if base_url is not UNSET:
             cls.base_url = base_url
@@ -64,6 +71,8 @@ class SyncHttpClient:
             cls.cookies = cookies
         if timeout is not UNSET:
             cls.timeout = timeout
+        if retry_strategy is not UNSET:
+            cls.retry_strategy = retry_strategy
 
     @classmethod
     def open_global(cls) -> None:
@@ -127,15 +136,22 @@ class SyncHttpClient:
         content: ContentBodyType | None = None,
         json: JsonBodyType | None = None,
         timeout: float | None | Unset = UNSET,
+        retry_strategy: RetryStrategy | None | Unset = UNSET,
     ) -> httpx.Response:
-        return self._client.request(
-            method,
-            url,
-            params=params,
-            headers=headers,
-            content=content,
-            json=json,
-            timeout=timeout if timeout is not UNSET else self.timeout,
+        request_args = (method, url)
+        request_kwargs = {
+            "params": params,
+            "headers": headers,
+            "content": content,
+            "json": json,
+            "timeout": timeout if timeout is not UNSET else self.timeout,
+        }
+
+        retry_strategy = retry_strategy if retry_strategy is not UNSET else self.retry_strategy
+        return (
+            retry_strategy.retry(self._client.request, *request_args, **request_kwargs)
+            if retry_strategy
+            else self._client.request(*request_args, **request_kwargs)
         )
 
     def get(
@@ -145,8 +161,16 @@ class SyncHttpClient:
         params: ParamsType | None = None,
         headers: HeadersType | None = None,
         timeout: float | None | Unset = UNSET,
+        retry_strategy: RetryStrategy | None | Unset = UNSET,
     ) -> httpx.Response:
-        return self.request("GET", url, params=params, headers=headers, timeout=timeout)
+        return self.request(
+            "GET",
+            url,
+            params=params,
+            headers=headers,
+            timeout=timeout,
+            retry_strategy=retry_strategy,
+        )
 
     def post(
         self,
@@ -157,8 +181,18 @@ class SyncHttpClient:
         content: ContentBodyType | None = None,
         json: JsonBodyType | None = None,
         timeout: float | None | Unset = UNSET,
+        retry_strategy: RetryStrategy | None | Unset = UNSET,
     ) -> httpx.Response:
-        return self.request("POST", url, params=params, headers=headers, content=content, json=json, timeout=timeout)
+        return self.request(
+            "POST",
+            url,
+            params=params,
+            headers=headers,
+            content=content,
+            json=json,
+            timeout=timeout,
+            retry_strategy=retry_strategy,
+        )
 
     def put(
         self,
@@ -169,8 +203,18 @@ class SyncHttpClient:
         content: ContentBodyType | None = None,
         json: JsonBodyType | None = None,
         timeout: float | None | Unset = UNSET,
+        retry_strategy: RetryStrategy | None | Unset = UNSET,
     ) -> httpx.Response:
-        return self.request("PUT", url, params=params, headers=headers, content=content, json=json, timeout=timeout)
+        return self.request(
+            "PUT",
+            url,
+            params=params,
+            headers=headers,
+            content=content,
+            json=json,
+            timeout=timeout,
+            retry_strategy=retry_strategy,
+        )
 
     def patch(
         self,
@@ -181,8 +225,18 @@ class SyncHttpClient:
         content: ContentBodyType | None = None,
         json: JsonBodyType | None = None,
         timeout: float | None | Unset = UNSET,
+        retry_strategy: RetryStrategy | None | Unset = UNSET,
     ) -> httpx.Response:
-        return self.request("PATCH", url, params=params, headers=headers, content=content, json=json, timeout=timeout)
+        return self.request(
+            "PATCH",
+            url,
+            params=params,
+            headers=headers,
+            content=content,
+            json=json,
+            timeout=timeout,
+            retry_strategy=retry_strategy,
+        )
 
     def delete(
         self,
@@ -191,5 +245,13 @@ class SyncHttpClient:
         params: ParamsType | None = None,
         headers: HeadersType | None = None,
         timeout: float | None | Unset = UNSET,
+        retry_strategy: RetryStrategy | None | Unset = UNSET,
     ) -> httpx.Response:
-        return self.request("DELETE", url, params=params, headers=headers, timeout=timeout)
+        return self.request(
+            "DELETE",
+            url,
+            params=params,
+            headers=headers,
+            timeout=timeout,
+            retry_strategy=retry_strategy,
+        )
