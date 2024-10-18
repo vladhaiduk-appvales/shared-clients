@@ -10,7 +10,7 @@ from clients.http import SyncHttpClient
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     print("Startup")
-    SyncHttpClient.configure(base_url="https://httpbin.org")
+    SyncHttpClient.configure(base_url="https://httpbin.org", timeout=None)
     SyncHttpClient.open_global()
     yield
     SyncHttpClient.close_global()
@@ -42,6 +42,19 @@ async def sync_local_usecase() -> dict:
     return response.json()
 
 
+@app.get("/sync/local/timeout")
+async def sync_local_timeout_usecase() -> list[dict]:
+    # Local client timeout takes precedence over the global timeout.
+    client = SyncHttpClient(timeout=5)
+
+    client.open()
+    # Concreate request timeout has the highest priority.
+    response = client.get(url="http://127.0.0.1:5000/users", timeout=2)
+    client.close()
+
+    return response.json()
+
+
 @app.get("/sync/local/context-manager")
 async def sync_local_context_manager_usecase() -> list[dict]:
     # Context manager automatically opens and closes a local httpx client.
@@ -52,4 +65,4 @@ async def sync_local_context_manager_usecase() -> list[dict]:
 
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", reload=True)
+    uvicorn.run("main:app", port=8000, reload=True)

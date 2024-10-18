@@ -17,7 +17,7 @@ class SyncHttpClient:
     base_params: ParamsType | None = None
     base_headers: ParamsType | None = None
     cookies: CookiesType | None = None
-    timeout: float | None = None
+    timeout: float | None = 5.0
 
     _global_client: httpx.Client | None = None
 
@@ -48,17 +48,22 @@ class SyncHttpClient:
     def configure(
         cls,
         *,
-        base_url: str | None = None,
-        base_params: ParamsType | None = None,
-        base_headers: HeadersType | None = None,
-        cookies: CookiesType | None = None,
-        timeout: float | None = None,
+        base_url: str | None | Unset = UNSET,
+        base_params: ParamsType | None | Unset = UNSET,
+        base_headers: HeadersType | None | Unset = UNSET,
+        cookies: CookiesType | None | Unset = UNSET,
+        timeout: float | None | Unset = UNSET,
     ) -> SyncHttpClient:
-        cls.base_url = base_url
-        cls.base_params = base_params
-        cls.base_headers = base_headers
-        cls.cookies = cookies
-        cls.timeout = timeout
+        if base_url is not UNSET:
+            cls.base_url = base_url
+        if base_params is not UNSET:
+            cls.base_params = base_params
+        if base_headers is not UNSET:
+            cls.base_headers = base_headers
+        if cookies is not UNSET:
+            cls.cookies = cookies
+        if timeout is not UNSET:
+            cls.timeout = timeout
 
     @classmethod
     def open_global(cls) -> None:
@@ -121,8 +126,17 @@ class SyncHttpClient:
         # Currently, cleint does not support form data and file uploads.
         content: ContentBodyType | None = None,
         json: JsonBodyType | None = None,
+        timeout: float | None | Unset = UNSET,
     ) -> httpx.Response:
-        return self._client.request(method, url, params=params, headers=headers, content=content, json=json)
+        return self._client.request(
+            method,
+            url,
+            params=params,
+            headers=headers,
+            content=content,
+            json=json,
+            timeout=timeout if timeout is not UNSET else self.timeout,
+        )
 
     def get(
         self,
@@ -130,8 +144,9 @@ class SyncHttpClient:
         *,
         params: ParamsType | None = None,
         headers: HeadersType | None = None,
+        timeout: float | None | Unset = UNSET,
     ) -> httpx.Response:
-        return self.request("GET", url, params=params, headers=headers)
+        return self.request("GET", url, params=params, headers=headers, timeout=timeout)
 
     def post(
         self,
@@ -141,8 +156,9 @@ class SyncHttpClient:
         headers: HeadersType | None = None,
         content: ContentBodyType | None = None,
         json: JsonBodyType | None = None,
+        timeout: float | None | Unset = UNSET,
     ) -> httpx.Response:
-        return self.request("POST", url, params=params, headers=headers, content=content, json=json)
+        return self.request("POST", url, params=params, headers=headers, content=content, json=json, timeout=timeout)
 
     def put(
         self,
@@ -152,8 +168,9 @@ class SyncHttpClient:
         headers: HeadersType | None = None,
         content: ContentBodyType | None = None,
         json: JsonBodyType | None = None,
+        timeout: float | None | Unset = UNSET,
     ) -> httpx.Response:
-        return self.request("PUT", url, params=params, headers=headers, content=content, json=json)
+        return self.request("PUT", url, params=params, headers=headers, content=content, json=json, timeout=timeout)
 
     def patch(
         self,
@@ -163,8 +180,9 @@ class SyncHttpClient:
         headers: HeadersType | None = None,
         content: ContentBodyType | None = None,
         json: JsonBodyType | None = None,
+        timeout: float | None | Unset = UNSET,
     ) -> httpx.Response:
-        return self.request("PATCH", url, params=params, headers=headers, content=content, json=json)
+        return self.request("PATCH", url, params=params, headers=headers, content=content, json=json, timeout=timeout)
 
     def delete(
         self,
@@ -172,5 +190,6 @@ class SyncHttpClient:
         *,
         params: ParamsType | None = None,
         headers: HeadersType | None = None,
+        timeout: float | None | Unset = UNSET,
     ) -> httpx.Response:
-        return self.request("DELETE", url, params=params, headers=headers)
+        return self.request("DELETE", url, params=params, headers=headers, timeout=timeout)
