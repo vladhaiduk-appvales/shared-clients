@@ -1,3 +1,5 @@
+import logging
+import logging.config
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -6,6 +8,29 @@ from fastapi import FastAPI
 
 from clients.http import SyncHttpClient
 from retry import RetryStrategy
+
+logging.config.dictConfig(
+    {
+        "version": 1,
+        "formatters": {
+            "default": {
+                "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            },
+        },
+        "handlers": {
+            "console": {
+                "class": "logging.StreamHandler",
+                "formatter": "default",
+            },
+        },
+        "loggers": {
+            "utils.clients.http": {
+                "level": "DEBUG",
+                "handlers": ["console"],
+            },
+        },
+    }
+)
 
 
 @asynccontextmanager
@@ -50,7 +75,7 @@ async def sync_local_timeout_usecase() -> list[dict]:
 
     client.open()
     # Concreate request timeout has the highest priority.
-    response = client.get(url="http://127.0.0.1:5000/users", timeout=2)
+    response = client.get("http://127.0.0.1:5000/users", timeout=2)
     client.close()
 
     return response.json()
@@ -73,7 +98,7 @@ async def sync_local_retry_usecase() -> list[dict]:
         # In this case requests will to be retried in case of any exception, including timeouts.
         retry_strategy=RetryStrategy(attempts=3, delay=1),
     ) as client:
-        response = client.get(url="/posts")
+        response = client.get("/posts")
 
     return response.json()
 

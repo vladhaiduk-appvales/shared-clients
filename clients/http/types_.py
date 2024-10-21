@@ -1,8 +1,10 @@
 from collections.abc import Mapping, Sequence
-from typing import Union
+from typing import Literal, Union
 
 import httpx
 
+# Currently, not all HTTP methods are supported by the client.
+MethodType = Literal["GET", "POST", "PUT", "PATCH", "DELETE"]
 UrlType = str
 
 PrimitiveValue = httpx._types.PrimitiveData

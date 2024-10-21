@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 import httpx
 
 from consts import UNSET, Unset
+from loggers import http_clients_logger
 
 if TYPE_CHECKING:
     from types import TracebackType
@@ -17,6 +18,7 @@ if TYPE_CHECKING:
         CookiesType,
         HeadersType,
         JsonBodyType,
+        MethodType,
         ParamsType,
         ProxyType,
         TimeoutType,
@@ -168,12 +170,12 @@ class SyncHttpClient:
         self._local_client.__exit__(exc_type, exc_value, traceback)
         self.close()
 
-    def request(
+    def _send_request(
         self,
-        # Currently, not all HTTP methods are supported by the client.
-        method: Literal["GET", "POST", "PUT", "PATCH", "DELETE"],
+        method: MethodType,
         url: UrlType,
         *,
+        name: str | None = None,
         params: ParamsType | None = None,
         headers: HeadersType | None = None,
         auth: httpx.Auth | None | Unset = UNSET,
@@ -181,29 +183,87 @@ class SyncHttpClient:
         content: ContentBodyType | None = None,
         json: JsonBodyType | None = None,
         timeout: TimeoutType | None | Unset = UNSET,
+    ) -> httpx.Response:
+        request_name = name or "unnamed"
+        request = self._client.build_request(
+            method,
+            url,
+            params=params,
+            headers=headers,
+            content=content,
+            json=json,
+            timeout=timeout if timeout is not UNSET else self.timeout,
+        )
+
+        http_clients_logger.info(
+            f"Sending HTTP request [{request_name}]: {request.method} {request.url}",
+            extra={
+                "request_name": request_name,
+                "method": request.method,
+                "url": request.url,
+                "headers": request.headers,
+                "body": request.content.decode(),
+            },
+        )
+
+        response = self._client.send(request, auth=auth if auth is not UNSET else self.auth)
+
+        http_clients_logger.info(
+            f"HTTP response received [{request_name}]: {request.method} {request.url} -> {response.status_code}",
+            extra={
+                "request": {
+                    "name": request_name,
+                    "method": request.method,
+                    "url": request.url,
+                },
+                "response": {
+                    "status_code": response.status_code,
+                    "headers": response.headers,
+                    "body": response.text,
+                    "elapsed_time": response.elapsed.total_seconds(),
+                },
+            },
+        )
+
+        return response
+
+    def request(
+        self,
+        method: MethodType,
+        url: UrlType,
+        *,
+        name: str | None = None,
+        params: ParamsType | None = None,
+        headers: HeadersType | None = None,
+        auth: httpx.Auth | None | Unset = UNSET,
+        content: ContentBodyType | None = None,
+        json: JsonBodyType | None = None,
+        timeout: TimeoutType | None | Unset = UNSET,
         retry_strategy: RetryStrategy | None | Unset = UNSET,
     ) -> httpx.Response:
-        request_args = (method, url)
         request_kwargs = {
+            "method": method,
+            "url": url,
+            "name": name,
             "params": params,
             "headers": headers,
-            "auth": auth if auth is not UNSET else self.auth,
+            "auth": auth,
             "content": content,
             "json": json,
-            "timeout": timeout if timeout is not UNSET else self.timeout,
+            "timeout": timeout,
         }
-
         retry_strategy = retry_strategy if retry_strategy is not UNSET else self.retry_strategy
         return (
-            retry_strategy.retry(self._client.request, *request_args, **request_kwargs)
+            retry_strategy.retry(self._send_request, **request_kwargs)
             if retry_strategy
-            else self._client.request(*request_args, **request_kwargs)
+            else self._send_request(**request_kwargs)
         )
 
     def get(
         self,
         url: UrlType,
         *,
+        name: str | None = None,
         params: ParamsType | None = None,
         headers: HeadersType | None = None,
         auth: httpx.Auth | None | Unset = UNSET,
@@ -213,6 +273,7 @@ class SyncHttpClient:
         return self.request(
             "GET",
             url,
+            name=name,
             params=params,
             headers=headers,
             auth=auth,
@@ -224,6 +285,7 @@ class SyncHttpClient:
         self,
         url: UrlType,
         *,
+        name: str | None = None,
         params: ParamsType | None = None,
         headers: HeadersType | None = None,
         auth: httpx.Auth | None | Unset = UNSET,
@@ -235,6 +297,7 @@ class SyncHttpClient:
         return self.request(
             "POST",
             url,
+            name=name,
             params=params,
             headers=headers,
             auth=auth,
@@ -248,6 +311,7 @@ class SyncHttpClient:
         self,
         url: UrlType,
         *,
+        name: str | None = None,
         params: ParamsType | None = None,
         headers: HeadersType | None = None,
         auth: httpx.Auth | None | Unset = UNSET,
@@ -259,6 +323,7 @@ class SyncHttpClient:
         return self.request(
             "PUT",
             url,
+            name=name,
             params=params,
             headers=headers,
             auth=auth,
@@ -272,6 +337,7 @@ class SyncHttpClient:
         self,
         url: UrlType,
         *,
+        name: str | None = None,
         params: ParamsType | None = None,
         headers: HeadersType | None = None,
         auth: httpx.Auth | None | Unset = UNSET,
@@ -283,6 +349,7 @@ class SyncHttpClient:
         return self.request(
             "PATCH",
             url,
+            name=name,
             params=params,
             headers=headers,
             auth=auth,
@@ -296,6 +363,7 @@ class SyncHttpClient:
         self,
         url: UrlType,
         *,
+        name: str | None = None,
         params: ParamsType | None = None,
         headers: HeadersType | None = None,
         auth: httpx.Auth | None | Unset = UNSET,
@@ -305,6 +373,7 @@ class SyncHttpClient:
         return self.request(
             "DELETE",
             url,
+            name=name,
             params=params,
             headers=headers,
             auth=auth,
