@@ -11,15 +11,27 @@ if TYPE_CHECKING:
 
     from retry import RetryStrategy
 
-    from .types_ import ContentBodyType, CookiesType, HeadersType, JsonBodyType, ParamsType
+    from .types_ import (
+        CertType,
+        ContentBodyType,
+        CookiesType,
+        HeadersType,
+        JsonBodyType,
+        ParamsType,
+        ProxyType,
+        TimeoutType,
+        UrlType,
+    )
 
 
 class SyncHttpClient:
-    base_url: str | None = None
+    base_url: UrlType | None = None
     base_params: ParamsType | None = None
     base_headers: ParamsType | None = None
     cookies: CookiesType | None = None
-    timeout: float | None = 5.0
+    proxy: ProxyType | None = None
+    cert: CertType | None = None
+    timeout: TimeoutType | None = 5.0
     retry_strategy: RetryStrategy | None = None
 
     _global_client: httpx.Client | None = None
@@ -27,11 +39,13 @@ class SyncHttpClient:
     def __init__(
         self,
         *,
-        base_url: str | None | Unset = UNSET,
+        base_url: UrlType | None | Unset = UNSET,
         base_params: ParamsType | None | Unset = UNSET,
         base_headers: HeadersType | None | Unset = UNSET,
         cookies: CookiesType | None | Unset = UNSET,
-        timeout: float | None | Unset = UNSET,
+        proxy: ProxyType | None | Unset = UNSET,
+        cert: CertType | None | Unset = UNSET,
+        timeout: TimeoutType | None | Unset = UNSET,
         retry_strategy: RetryStrategy | None | Unset = UNSET,
     ) -> None:
         # Instance-level attributes do not delete class-level attributes; they simply shadow them.
@@ -43,6 +57,10 @@ class SyncHttpClient:
             self.base_headers = base_headers
         if cookies is not UNSET:
             self.cookies = cookies
+        if proxy is not UNSET:
+            self.proxy = proxy
+        if cert is not UNSET:
+            self.cert = cert
         if timeout is not UNSET:
             self.timeout = timeout
         if retry_strategy is not UNSET:
@@ -54,11 +72,13 @@ class SyncHttpClient:
     def configure(
         cls,
         *,
-        base_url: str | None | Unset = UNSET,
+        base_url: UrlType | None | Unset = UNSET,
         base_params: ParamsType | None | Unset = UNSET,
         base_headers: HeadersType | None | Unset = UNSET,
         cookies: CookiesType | None | Unset = UNSET,
-        timeout: float | None | Unset = UNSET,
+        proxy: ProxyType | None | Unset = UNSET,
+        cert: CertType | None | Unset = UNSET,
+        timeout: TimeoutType | None | Unset = UNSET,
         retry_strategy: RetryStrategy | None | Unset = UNSET,
     ) -> SyncHttpClient:
         if base_url is not UNSET:
@@ -69,6 +89,10 @@ class SyncHttpClient:
             cls.base_headers = base_headers
         if cookies is not UNSET:
             cls.cookies = cookies
+        if proxy is not UNSET:
+            cls.proxy = proxy
+        if cert is not UNSET:
+            cls.cert = cert
         if timeout is not UNSET:
             cls.timeout = timeout
         if retry_strategy is not UNSET:
@@ -82,6 +106,8 @@ class SyncHttpClient:
                 params=cls.base_params,
                 headers=cls.base_headers,
                 cookies=cls.cookies,
+                proxy=cls.proxy,
+                cert=cls.cert,
                 timeout=cls.timeout,
             )
 
@@ -97,6 +123,8 @@ class SyncHttpClient:
                 params=self.base_params,
                 headers=self.base_headers,
                 cookies=self.cookies,
+                proxy=self.proxy,
+                cert=self.cert,
                 timeout=self.timeout,
             )
 
@@ -128,14 +156,14 @@ class SyncHttpClient:
         self,
         # Currently, not all HTTP methods are supported by the client.
         method: Literal["GET", "POST", "PUT", "PATCH", "DELETE"],
-        url: str,
+        url: UrlType,
         *,
         params: ParamsType | None = None,
         headers: HeadersType | None = None,
         # Currently, cleint does not support form data and file uploads.
         content: ContentBodyType | None = None,
         json: JsonBodyType | None = None,
-        timeout: float | None | Unset = UNSET,
+        timeout: TimeoutType | None | Unset = UNSET,
         retry_strategy: RetryStrategy | None | Unset = UNSET,
     ) -> httpx.Response:
         request_args = (method, url)
@@ -156,11 +184,11 @@ class SyncHttpClient:
 
     def get(
         self,
-        url: str,
+        url: UrlType,
         *,
         params: ParamsType | None = None,
         headers: HeadersType | None = None,
-        timeout: float | None | Unset = UNSET,
+        timeout: TimeoutType | None | Unset = UNSET,
         retry_strategy: RetryStrategy | None | Unset = UNSET,
     ) -> httpx.Response:
         return self.request(
@@ -174,13 +202,13 @@ class SyncHttpClient:
 
     def post(
         self,
-        url: str,
+        url: UrlType,
         *,
         params: ParamsType | None = None,
         headers: HeadersType | None = None,
         content: ContentBodyType | None = None,
         json: JsonBodyType | None = None,
-        timeout: float | None | Unset = UNSET,
+        timeout: TimeoutType | None | Unset = UNSET,
         retry_strategy: RetryStrategy | None | Unset = UNSET,
     ) -> httpx.Response:
         return self.request(
@@ -196,13 +224,13 @@ class SyncHttpClient:
 
     def put(
         self,
-        url: str,
+        url: UrlType,
         *,
         params: ParamsType | None = None,
         headers: HeadersType | None = None,
         content: ContentBodyType | None = None,
         json: JsonBodyType | None = None,
-        timeout: float | None | Unset = UNSET,
+        timeout: TimeoutType | None | Unset = UNSET,
         retry_strategy: RetryStrategy | None | Unset = UNSET,
     ) -> httpx.Response:
         return self.request(
@@ -218,13 +246,13 @@ class SyncHttpClient:
 
     def patch(
         self,
-        url: str,
+        url: UrlType,
         *,
         params: ParamsType | None = None,
         headers: HeadersType | None = None,
         content: ContentBodyType | None = None,
         json: JsonBodyType | None = None,
-        timeout: float | None | Unset = UNSET,
+        timeout: TimeoutType | None | Unset = UNSET,
         retry_strategy: RetryStrategy | None | Unset = UNSET,
     ) -> httpx.Response:
         return self.request(
@@ -240,11 +268,11 @@ class SyncHttpClient:
 
     def delete(
         self,
-        url: str,
+        url: UrlType,
         *,
         params: ParamsType | None = None,
         headers: HeadersType | None = None,
-        timeout: float | None | Unset = UNSET,
+        timeout: TimeoutType | None | Unset = UNSET,
         retry_strategy: RetryStrategy | None | Unset = UNSET,
     ) -> httpx.Response:
         return self.request(
