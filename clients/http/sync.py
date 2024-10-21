@@ -25,10 +25,18 @@ if TYPE_CHECKING:
 
 
 class SyncHttpClient:
+    """A wrapper around the HTTPX Client, designed to streamline and extend its functionality to meet our needs.
+
+    This client provides an intuitive and extended interface for executing synchronous HTTP requests while maintaining
+    the core capabilities of the HTTPX Client. It is not a complete wrapper around HTTPX that would allow for replacing
+    HTTPX with another library. Instead, it simply extends the HTTPX Client with the features we need.
+    """
+
     base_url: UrlType | None = None
     base_params: ParamsType | None = None
     base_headers: ParamsType | None = None
     cookies: CookiesType | None = None
+    auth: httpx.Auth | None = None
     proxy: ProxyType | None = None
     cert: CertType | None = None
     timeout: TimeoutType | None = 5.0
@@ -43,6 +51,7 @@ class SyncHttpClient:
         base_params: ParamsType | None | Unset = UNSET,
         base_headers: HeadersType | None | Unset = UNSET,
         cookies: CookiesType | None | Unset = UNSET,
+        auth: httpx.Auth | None | Unset = UNSET,
         proxy: ProxyType | None | Unset = UNSET,
         cert: CertType | None | Unset = UNSET,
         timeout: TimeoutType | None | Unset = UNSET,
@@ -57,6 +66,8 @@ class SyncHttpClient:
             self.base_headers = base_headers
         if cookies is not UNSET:
             self.cookies = cookies
+        if auth is not UNSET:
+            self.auth = auth
         if proxy is not UNSET:
             self.proxy = proxy
         if cert is not UNSET:
@@ -76,6 +87,7 @@ class SyncHttpClient:
         base_params: ParamsType | None | Unset = UNSET,
         base_headers: HeadersType | None | Unset = UNSET,
         cookies: CookiesType | None | Unset = UNSET,
+        auth: httpx.Auth | None | Unset = UNSET,
         proxy: ProxyType | None | Unset = UNSET,
         cert: CertType | None | Unset = UNSET,
         timeout: TimeoutType | None | Unset = UNSET,
@@ -89,6 +101,8 @@ class SyncHttpClient:
             cls.base_headers = base_headers
         if cookies is not UNSET:
             cls.cookies = cookies
+        if auth is not UNSET:
+            cls.auth = auth
         if proxy is not UNSET:
             cls.proxy = proxy
         if cert is not UNSET:
@@ -106,6 +120,7 @@ class SyncHttpClient:
                 params=cls.base_params,
                 headers=cls.base_headers,
                 cookies=cls.cookies,
+                auth=cls.auth,
                 proxy=cls.proxy,
                 cert=cls.cert,
                 timeout=cls.timeout,
@@ -123,6 +138,7 @@ class SyncHttpClient:
                 params=self.base_params,
                 headers=self.base_headers,
                 cookies=self.cookies,
+                auth=self.auth,
                 proxy=self.proxy,
                 cert=self.cert,
                 timeout=self.timeout,
@@ -160,6 +176,7 @@ class SyncHttpClient:
         *,
         params: ParamsType | None = None,
         headers: HeadersType | None = None,
+        auth: httpx.Auth | None | Unset = UNSET,
         # Currently, cleint does not support form data and file uploads.
         content: ContentBodyType | None = None,
         json: JsonBodyType | None = None,
@@ -170,6 +187,7 @@ class SyncHttpClient:
         request_kwargs = {
             "params": params,
             "headers": headers,
+            "auth": auth if auth is not UNSET else self.auth,
             "content": content,
             "json": json,
             "timeout": timeout if timeout is not UNSET else self.timeout,
@@ -188,6 +206,7 @@ class SyncHttpClient:
         *,
         params: ParamsType | None = None,
         headers: HeadersType | None = None,
+        auth: httpx.Auth | None | Unset = UNSET,
         timeout: TimeoutType | None | Unset = UNSET,
         retry_strategy: RetryStrategy | None | Unset = UNSET,
     ) -> httpx.Response:
@@ -196,6 +215,7 @@ class SyncHttpClient:
             url,
             params=params,
             headers=headers,
+            auth=auth,
             timeout=timeout,
             retry_strategy=retry_strategy,
         )
@@ -206,6 +226,7 @@ class SyncHttpClient:
         *,
         params: ParamsType | None = None,
         headers: HeadersType | None = None,
+        auth: httpx.Auth | None | Unset = UNSET,
         content: ContentBodyType | None = None,
         json: JsonBodyType | None = None,
         timeout: TimeoutType | None | Unset = UNSET,
@@ -216,6 +237,7 @@ class SyncHttpClient:
             url,
             params=params,
             headers=headers,
+            auth=auth,
             content=content,
             json=json,
             timeout=timeout,
@@ -228,6 +250,7 @@ class SyncHttpClient:
         *,
         params: ParamsType | None = None,
         headers: HeadersType | None = None,
+        auth: httpx.Auth | None | Unset = UNSET,
         content: ContentBodyType | None = None,
         json: JsonBodyType | None = None,
         timeout: TimeoutType | None | Unset = UNSET,
@@ -238,6 +261,7 @@ class SyncHttpClient:
             url,
             params=params,
             headers=headers,
+            auth=auth,
             content=content,
             json=json,
             timeout=timeout,
@@ -250,6 +274,7 @@ class SyncHttpClient:
         *,
         params: ParamsType | None = None,
         headers: HeadersType | None = None,
+        auth: httpx.Auth | None | Unset = UNSET,
         content: ContentBodyType | None = None,
         json: JsonBodyType | None = None,
         timeout: TimeoutType | None | Unset = UNSET,
@@ -260,6 +285,7 @@ class SyncHttpClient:
             url,
             params=params,
             headers=headers,
+            auth=auth,
             content=content,
             json=json,
             timeout=timeout,
@@ -272,6 +298,7 @@ class SyncHttpClient:
         *,
         params: ParamsType | None = None,
         headers: HeadersType | None = None,
+        auth: httpx.Auth | None | Unset = UNSET,
         timeout: TimeoutType | None | Unset = UNSET,
         retry_strategy: RetryStrategy | None | Unset = UNSET,
     ) -> httpx.Response:
@@ -280,6 +307,7 @@ class SyncHttpClient:
             url,
             params=params,
             headers=headers,
+            auth=auth,
             timeout=timeout,
             retry_strategy=retry_strategy,
         )

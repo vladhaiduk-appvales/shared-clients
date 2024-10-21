@@ -1,9 +1,11 @@
 from collections.abc import Mapping, Sequence
-from typing import Optional, Union
+from typing import Union
+
+import httpx
 
 UrlType = str
 
-PrimitiveValue = Union[int, float, bool, str, None]
+PrimitiveValue = httpx._types.PrimitiveData
 
 ParamsType = Mapping[str, Union[PrimitiveValue, Sequence[PrimitiveValue]]]
 HeadersType = Mapping[str, str]
@@ -14,12 +16,5 @@ ContentBodyType = str
 JsonBodyType = Union[Mapping[str, any], Sequence[dict[str, any]]]
 
 ProxyType = str
-CertType = Union[
-    # certfile
-    str,
-    # (certfile, keyfile)
-    tuple[str, Optional[str]],
-    # (certfile, keyfile, password)
-    tuple[str, Optional[str], Optional[str]],
-]
+CertType = httpx._types.CertTypes
 TimeoutType = float
