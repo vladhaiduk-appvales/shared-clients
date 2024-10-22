@@ -20,3 +20,5 @@ JsonBodyType = Union[Mapping[str, any], Sequence[dict[str, any]]]
 ProxyType = str
 CertType = httpx._types.CertTypes
 TimeoutType = float
+
+DetailsType = Mapping[str, any]

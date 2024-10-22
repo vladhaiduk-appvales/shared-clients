@@ -17,6 +17,7 @@ if TYPE_CHECKING:
         CertType,
         ContentBodyType,
         CookiesType,
+        DetailsType,
         HeadersType,
         JsonBodyType,
         MethodType,
@@ -207,8 +208,10 @@ class SyncHttpClient:
         self._local_client.__exit__(exc_type, exc_value, traceback)
         self.close()
 
-    def request_log(self, *, request_name: str, request: httpx.Request) -> tuple[str, dict[str, any]]:
+    def request_log(self, *, request: httpx.Request, details: DetailsType | None = None) -> tuple[str, dict[str, any]]:
         extra = {"request": {}}
+
+        request_name = details.get("request_name")
 
         if self.request_log_config.request_name:
             extra["request"]["name"] = request_name
@@ -226,8 +229,12 @@ class SyncHttpClient:
 
         return f"Sending HTTP request [{request_name}]: {request.method} {request.url}", extra
 
-    def response_log(self, *, request_name: str, response: httpx.Response) -> tuple[str, dict[str, any]]:
+    def response_log(
+        self, *, response: httpx.Response, details: DetailsType | None = None
+    ) -> tuple[str, dict[str, any]]:
         extra = {"request": {}, "response": {}}
+
+        request_name = details.get("request_name")
 
         if self.response_log_config.request_name:
             extra["request"]["name"] = request_name
@@ -260,7 +267,6 @@ class SyncHttpClient:
         method: MethodType,
         url: UrlType,
         *,
-        name: str | None = None,
         params: ParamsType | None = None,
         headers: HeadersType | None = None,
         auth: httpx.Auth | None | Unset = UNSET,
@@ -268,8 +274,8 @@ class SyncHttpClient:
         content: ContentBodyType | None = None,
         json: JsonBodyType | None = None,
         timeout: TimeoutType | None | Unset = UNSET,
+        details: DetailsType | None = None,
     ) -> httpx.Response:
-        request_name = name or "unnamed"
         request = self._client.build_request(
             method,
             url,
@@ -280,12 +286,12 @@ class SyncHttpClient:
             timeout=timeout if timeout is not UNSET else self.timeout,
         )
 
-        request_log_message, request_log_extra = self.request_log(request_name=request_name, request=request)
+        request_log_message, request_log_extra = self.request_log(request=request, details=details)
         http_clients_logger.info(request_log_message, extra=request_log_extra)
 
         response = self._client.send(request, auth=auth if auth is not UNSET else self.auth)
 
-        response_log_message, response_log_extra = self.response_log(request_name=request_name, response=response)
+        response_log_message, response_log_extra = self.response_log(response=response, details=details)
         http_clients_logger.info(response_log_message, extra=response_log_extra)
 
         return response
@@ -303,18 +309,25 @@ class SyncHttpClient:
         json: JsonBodyType | None = None,
         timeout: TimeoutType | None | Unset = UNSET,
         retry_strategy: RetryStrategy | None | Unset = UNSET,
+        details: DetailsType | None = None,
     ) -> httpx.Response:
+        details = details or {}
+
+        if "request_name" not in details:
+            details["request_name"] = name or "UNNAMED"
+
         request_kwargs = {
             "method": method,
             "url": url,
-            "name": name,
             "params": params,
             "headers": headers,
             "auth": auth,
             "content": content,
             "json": json,
             "timeout": timeout,
+            "details": details,
         }
+
         retry_strategy = retry_strategy if retry_strategy is not UNSET else self.retry_strategy
         return (
             retry_strategy.retry(self._send_request, **request_kwargs)
@@ -332,6 +345,7 @@ class SyncHttpClient:
         auth: httpx.Auth | None | Unset = UNSET,
         timeout: TimeoutType | None | Unset = UNSET,
         retry_strategy: RetryStrategy | None | Unset = UNSET,
+        details: DetailsType | None = None,
     ) -> httpx.Response:
         return self.request(
             "GET",
@@ -342,6 +356,7 @@ class SyncHttpClient:
             auth=auth,
             timeout=timeout,
             retry_strategy=retry_strategy,
+            details=details,
         )
 
     def post(
@@ -356,6 +371,7 @@ class SyncHttpClient:
         json: JsonBodyType | None = None,
         timeout: TimeoutType | None | Unset = UNSET,
         retry_strategy: RetryStrategy | None | Unset = UNSET,
+        details: DetailsType | None = None,
     ) -> httpx.Response:
         return self.request(
             "POST",
@@ -368,6 +384,7 @@ class SyncHttpClient:
             json=json,
             timeout=timeout,
             retry_strategy=retry_strategy,
+            details=details,
         )
 
     def put(
@@ -382,6 +399,7 @@ class SyncHttpClient:
         json: JsonBodyType | None = None,
         timeout: TimeoutType | None | Unset = UNSET,
         retry_strategy: RetryStrategy | None | Unset = UNSET,
+        details: DetailsType | None = None,
     ) -> httpx.Response:
         return self.request(
             "PUT",
@@ -394,6 +412,7 @@ class SyncHttpClient:
             json=json,
             timeout=timeout,
             retry_strategy=retry_strategy,
+            details=details,
         )
 
     def patch(
@@ -408,6 +427,7 @@ class SyncHttpClient:
         json: JsonBodyType | None = None,
         timeout: TimeoutType | None | Unset = UNSET,
         retry_strategy: RetryStrategy | None | Unset = UNSET,
+        details: DetailsType | None = None,
     ) -> httpx.Response:
         return self.request(
             "PATCH",
@@ -420,6 +440,7 @@ class SyncHttpClient:
             json=json,
             timeout=timeout,
             retry_strategy=retry_strategy,
+            details=details,
         )
 
     def delete(
@@ -432,6 +453,7 @@ class SyncHttpClient:
         auth: httpx.Auth | None | Unset = UNSET,
         timeout: TimeoutType | None | Unset = UNSET,
         retry_strategy: RetryStrategy | None | Unset = UNSET,
+        details: DetailsType | None = None,
     ) -> httpx.Response:
         return self.request(
             "DELETE",
@@ -442,4 +464,5 @@ class SyncHttpClient:
             auth=auth,
             timeout=timeout,
             retry_strategy=retry_strategy,
+            details=details,
         )

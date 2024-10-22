@@ -16,6 +16,7 @@ if TYPE_CHECKING:
         CertType,
         ContentBodyType,
         CookiesType,
+        DetailsType,
         HeadersType,
         JsonBodyType,
         MethodType,
@@ -109,22 +110,24 @@ class SyncSupplierClient(SyncHttpClient):
             response_log_config=response_log_config,
         )
 
-    def request_log(self, *, request_name: str, request: httpx.Request) -> tuple[str, dict[str, any]]:
-        message, extra = super().request_log(request_name=request_name, request=request)
-
+    def request_log(self, *, request: httpx.Request, details: DetailsType | None = None) -> tuple[str, dict[str, any]]:
+        message, extra = super().request_log(request=request, details=details)
         header, body = message.split(":", maxsplit=1)
-        supplier_code = self.supplier_code or "unknown"
+
+        supplier_code = details.get("supplier_code")
 
         if self.request_log_config.supplier_code:
             extra["supplier_code"] = supplier_code
 
         return f"{header} to [{supplier_code}] supplier:{body}", extra
 
-    def response_log(self, *, request_name: str, response: httpx.Response) -> tuple[str, dict[str, any]]:
-        message, extra = super().response_log(request_name=request_name, response=response)
-
+    def response_log(
+        self, *, response: httpx.Response, details: DetailsType | None = None
+    ) -> tuple[str, dict[str, any]]:
+        message, extra = super().response_log(response=response, details=details)
         header, body = message.split(":", maxsplit=1)
-        supplier_code = self.supplier_code or "unknown"
+
+        supplier_code = details.get("supplier_code")
 
         if self.request_log_config.supplier_code:
             extra["supplier_code"] = supplier_code
@@ -136,8 +139,8 @@ class SyncSupplierClient(SyncHttpClient):
         method: MethodType,
         url: UrlType,
         *,
-        supplier_code: str | None | Unset = UNSET,
         name: str | None = None,
+        supplier_code: str | None = None,
         params: ParamsType | None = None,
         headers: HeadersType | None = None,
         auth: httpx.Auth | None | Unset = UNSET,
@@ -145,7 +148,13 @@ class SyncSupplierClient(SyncHttpClient):
         json: JsonBodyType | None = None,
         timeout: TimeoutType | None | Unset = UNSET,
         retry_strategy: RetryStrategy | None | Unset = UNSET,
+        details: DetailsType | None = None,
     ) -> httpx.Response:
+        details = details or {}
+
+        if "supplier_code" not in details:
+            details["supplier_code"] = supplier_code or self.supplier_code or "UNKNOWN"
+
         return super().request(
             method,
             url,
@@ -157,36 +166,41 @@ class SyncSupplierClient(SyncHttpClient):
             json=json,
             timeout=timeout,
             retry_strategy=retry_strategy,
+            details=details,
         )
 
     def get(
         self,
         url: UrlType,
         *,
-        supplier_code: str | None | Unset = UNSET,
         name: str | None = None,
+        supplier_code: str | None = None,
         params: ParamsType | None = None,
         headers: HeadersType | None = None,
         auth: httpx.Auth | None | Unset = UNSET,
         timeout: TimeoutType | None | Unset = UNSET,
         retry_strategy: RetryStrategy | None | Unset = UNSET,
+        details: DetailsType | None = None,
     ) -> httpx.Response:
-        return super().get(
+        return self.request(
+            "GET",
             url,
             name=name,
+            supplier_code=supplier_code,
             params=params,
             headers=headers,
             auth=auth,
             timeout=timeout,
             retry_strategy=retry_strategy,
+            details=details,
         )
 
     def post(
         self,
         url: UrlType,
         *,
-        supplier_code: str | None | Unset = UNSET,
         name: str | None = None,
+        supplier_code: str | None = None,
         params: ParamsType | None = None,
         headers: HeadersType | None = None,
         auth: httpx.Auth | None | Unset = UNSET,
@@ -194,10 +208,13 @@ class SyncSupplierClient(SyncHttpClient):
         json: JsonBodyType | None = None,
         timeout: TimeoutType | None | Unset = UNSET,
         retry_strategy: RetryStrategy | None | Unset = UNSET,
+        details: DetailsType | None = None,
     ) -> httpx.Response:
-        return super().post(
+        return self.request(
+            "POST",
             url,
             name=name,
+            supplier_code=supplier_code,
             params=params,
             headers=headers,
             auth=auth,
@@ -205,14 +222,15 @@ class SyncSupplierClient(SyncHttpClient):
             json=json,
             timeout=timeout,
             retry_strategy=retry_strategy,
+            details=details,
         )
 
     def put(
         self,
         url: UrlType,
         *,
-        supplier_code: str | None | Unset = UNSET,
         name: str | None = None,
+        supplier_code: str | None = None,
         params: ParamsType | None = None,
         headers: HeadersType | None = None,
         auth: httpx.Auth | None | Unset = UNSET,
@@ -220,10 +238,13 @@ class SyncSupplierClient(SyncHttpClient):
         json: JsonBodyType | None = None,
         timeout: TimeoutType | None | Unset = UNSET,
         retry_strategy: RetryStrategy | None | Unset = UNSET,
+        details: DetailsType | None = None,
     ) -> httpx.Response:
-        return super().put(
+        return self.request(
+            "PUT",
             url,
             name=name,
+            supplier_code=supplier_code,
             params=params,
             headers=headers,
             auth=auth,
@@ -231,14 +252,15 @@ class SyncSupplierClient(SyncHttpClient):
             json=json,
             timeout=timeout,
             retry_strategy=retry_strategy,
+            details=details,
         )
 
     def patch(
         self,
         url: UrlType,
         *,
-        supplier_code: str | None | Unset = UNSET,
         name: str | None = None,
+        supplier_code: str | None = None,
         params: ParamsType | None = None,
         headers: HeadersType | None = None,
         auth: httpx.Auth | None | Unset = UNSET,
@@ -246,10 +268,13 @@ class SyncSupplierClient(SyncHttpClient):
         json: JsonBodyType | None = None,
         timeout: TimeoutType | None | Unset = UNSET,
         retry_strategy: RetryStrategy | None | Unset = UNSET,
+        details: DetailsType | None = None,
     ) -> httpx.Response:
-        return super().patch(
+        return self.request(
+            "PATCH",
             url,
             name=name,
+            supplier_code=supplier_code,
             params=params,
             headers=headers,
             auth=auth,
@@ -257,26 +282,31 @@ class SyncSupplierClient(SyncHttpClient):
             json=json,
             timeout=timeout,
             retry_strategy=retry_strategy,
+            details=details,
         )
 
     def delete(
         self,
         url: UrlType,
         *,
-        supplier_code: str | None | Unset = UNSET,
         name: str | None = None,
+        supplier_code: str | None = None,
         params: ParamsType | None = None,
         headers: HeadersType | None = None,
         auth: httpx.Auth | None | Unset = UNSET,
         timeout: TimeoutType | None | Unset = UNSET,
         retry_strategy: RetryStrategy | None | Unset = UNSET,
+        details: DetailsType | None = None,
     ) -> httpx.Response:
-        return super().delete(
+        return self.request(
+            "DELETE",
             url,
             name=name,
+            supplier_code=supplier_code,
             params=params,
             headers=headers,
             auth=auth,
             timeout=timeout,
             retry_strategy=retry_strategy,
+            details=details,
         )

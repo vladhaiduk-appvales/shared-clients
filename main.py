@@ -15,7 +15,7 @@ logging.config.dictConfig(
         "disable_existing_loggers": False,
         "formatters": {
             "json": {
-                "format": "%(message)s",
+                "format": "%(levelname)s %(asctime)s %(message)s",
                 "()": "pythonjsonlogger.jsonlogger.JsonFormatter",
                 "json_indent": 4,
             },
