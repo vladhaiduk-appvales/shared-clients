@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 import uvicorn
 from fastapi import FastAPI
 
-from clients.http import SyncHttpClient
+from clients.http import SyncHttpClient, SyncSupplierClient
 from retry import RetryStrategy
 
 logging.config.dictConfig(
@@ -36,10 +36,18 @@ logging.config.dictConfig(
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     print("Startup")
+
     SyncHttpClient.configure(base_url="https://httpbin.org", timeout=None)
     SyncHttpClient.open_global()
+
+    SyncSupplierClient.configure(supplier_code="RCL", base_url="https://httpbin.org")
+    SyncSupplierClient.open_global()
+
     yield
+
     SyncHttpClient.close_global()
+    SyncSupplierClient.close_global()
+
     print("Shutdown")
 
 
@@ -99,6 +107,37 @@ async def sync_local_retry_usecase() -> list[dict]:
         retry_strategy=RetryStrategy(attempts=3, delay=1),
     ) as client:
         response = client.get("/posts")
+
+    return response.json()
+
+
+@app.get("/sync_supplier/global")
+async def sync_supplier_global_usecase() -> dict:
+    client = SyncSupplierClient()
+
+    response = client.get("/get")
+
+    return response.json()
+
+
+@app.get("/sync_supplier/local")
+async def sync_supplier_local_usecase() -> dict:
+    client = SyncSupplierClient()
+
+    client.open()
+    response = client.get("/get")
+    client.close()
+
+    return response.json()
+
+
+@app.get("/sync_supplier/local/custom_supplier_code")
+async def sync_supplier_local__usecase(supplier_code: str) -> dict:
+    client = SyncSupplierClient()
+
+    client.open()
+    response = client.get("/get", supplier_code=supplier_code)
+    client.close()
 
     return response.json()
 
