@@ -87,6 +87,22 @@ class SyncSupplierClient(SyncHttpClient):
             retry_strategy=retry_strategy,
         )
 
+    def request_log(self, *, request_name: str, request: httpx.Request) -> tuple[str, dict[str, any] | None]:
+        message, extra = super().request_log(request_name=request_name, request=request)
+
+        header, body = message.split(":", maxsplit=1)
+        supplier_code = self.supplier_code or "unknown"
+
+        return f"{header} to [{supplier_code}] supplier:{body}", {"supplier_code": supplier_code, **extra}
+
+    def response_log(self, *, request_name: str, response: httpx.Response) -> tuple[str, dict[str, any] | None]:
+        message, extra = super().response_log(request_name=request_name, response=response)
+
+        header, body = message.split(":", maxsplit=1)
+        supplier_code = self.supplier_code or "unknown"
+
+        return f"{header} from [{supplier_code}] supplier:{body}", {"supplier_code": supplier_code, **extra}
+
     def request(
         self,
         method: MethodType,
