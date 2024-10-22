@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import httpx
@@ -26,6 +27,27 @@ if TYPE_CHECKING:
     )
 
 
+@dataclass
+class HttpRequestLogConfig:
+    request_name: bool = True
+    request_method: bool = True
+    request_url: bool = True
+    request_headers: bool = False
+    request_body: bool = False
+
+
+@dataclass
+class HttpResponseLogConfig:
+    request_name: bool = True
+    request_method: bool = True
+    request_url: bool = True
+
+    response_status_code: bool = True
+    response_headers: bool = False
+    response_body: bool = False
+    response_elapsed_time: bool = True
+
+
 class SyncHttpClient:
     """A wrapper around the HTTPX Client, designed to streamline and extend its functionality to meet our needs.
 
@@ -44,6 +66,9 @@ class SyncHttpClient:
     timeout: TimeoutType | None = 5.0
     retry_strategy: RetryStrategy | None = None
 
+    request_log_config: HttpRequestLogConfig = HttpRequestLogConfig()
+    response_log_config: HttpResponseLogConfig = HttpResponseLogConfig()
+
     _global_client: httpx.Client | None = None
 
     def __init__(
@@ -58,6 +83,8 @@ class SyncHttpClient:
         cert: CertType | None | Unset = UNSET,
         timeout: TimeoutType | None | Unset = UNSET,
         retry_strategy: RetryStrategy | None | Unset = UNSET,
+        request_log_config: HttpRequestLogConfig | None | Unset = UNSET,
+        response_log_config: HttpResponseLogConfig | Unset = UNSET,
     ) -> None:
         # Instance-level attributes do not delete class-level attributes; they simply shadow them.
         if base_url is not UNSET:
@@ -78,6 +105,10 @@ class SyncHttpClient:
             self.timeout = timeout
         if retry_strategy is not UNSET:
             self.retry_strategy = retry_strategy
+        if request_log_config is not UNSET:
+            self.request_log_config = request_log_config
+        if response_log_config is not UNSET:
+            self.response_log_config = response_log_config
 
         self._local_client: httpx.Client | None = None
 
@@ -94,6 +125,8 @@ class SyncHttpClient:
         cert: CertType | None | Unset = UNSET,
         timeout: TimeoutType | None | Unset = UNSET,
         retry_strategy: RetryStrategy | None | Unset = UNSET,
+        request_log_config: HttpRequestLogConfig | None | Unset = UNSET,
+        response_log_config: HttpResponseLogConfig | Unset = UNSET,
     ) -> SyncHttpClient:
         if base_url is not UNSET:
             cls.base_url = base_url
@@ -113,6 +146,10 @@ class SyncHttpClient:
             cls.timeout = timeout
         if retry_strategy is not UNSET:
             cls.retry_strategy = retry_strategy
+        if request_log_config is not UNSET:
+            cls.request_log_config = request_log_config
+        if response_log_config is not UNSET:
+            cls.response_log_config = response_log_config
 
     @classmethod
     def open_global(cls) -> None:
@@ -170,34 +207,53 @@ class SyncHttpClient:
         self._local_client.__exit__(exc_type, exc_value, traceback)
         self.close()
 
-    def request_log(self, *, request_name: str, request: httpx.Request) -> tuple[str, dict[str, any] | None]:
-        return f"Sending HTTP request [{request_name}]: {request.method} {request.url}", {
-            "request": {
-                "name": request_name,
-                "method": request.method,
-                "url": request.url,
-                "headers": request.headers,
-                "body": request.content.decode(),
-            },
-        }
+    def request_log(self, *, request_name: str, request: httpx.Request) -> tuple[str, dict[str, any]]:
+        extra = {"request": {}}
 
-    def response_log(self, *, request_name: str, response: httpx.Response) -> tuple[str, dict[str, any] | None]:
+        if self.request_log_config.request_name:
+            extra["request"]["name"] = request_name
+        if self.request_log_config.request_method:
+            extra["request"]["method"] = request.method
+        if self.request_log_config.request_url:
+            extra["request"]["url"] = request.url
+        if self.request_log_config.request_headers:
+            extra["request"]["headers"] = request.headers
+        if self.request_log_config.request_body:
+            extra["request"]["body"] = request.content.decode()
+
+        if not extra["request"]:
+            del extra["request"]
+
+        return f"Sending HTTP request [{request_name}]: {request.method} {request.url}", extra
+
+    def response_log(self, *, request_name: str, response: httpx.Response) -> tuple[str, dict[str, any]]:
+        extra = {"request": {}, "response": {}}
+
+        if self.response_log_config.request_name:
+            extra["request"]["name"] = request_name
+        if self.response_log_config.request_method:
+            extra["request"]["method"] = response.request.method
+        if self.response_log_config.request_url:
+            extra["request"]["url"] = response.request.url
+
+        if self.response_log_config.response_status_code:
+            extra["response"]["status_code"] = response.status_code
+        if self.response_log_config.response_headers:
+            extra["response"]["headers"] = response.headers
+        if self.response_log_config.response_body:
+            extra["response"]["body"] = response.content.decode()
+        if self.response_log_config.response_elapsed_time:
+            extra["response"]["elapsed_time"] = response.elapsed.total_seconds()
+
+        if not extra["request"]:
+            del extra["request"]
+        if not extra["response"]:
+            del extra["response"]
+
         return (
             f"HTTP response received [{request_name}]: "
             f"{response.request.method} {response.request.url} -> {response.status_code}"
-        ), {
-            "request": {
-                "name": request_name,
-                "method": response.request.method,
-                "url": response.request.url,
-            },
-            "response": {
-                "status_code": response.status_code,
-                "headers": response.headers,
-                "body": response.text,
-                "elapsed_time": response.elapsed.total_seconds(),
-            },
-        }
+        ), extra
 
     def _send_request(
         self,
