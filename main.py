@@ -9,23 +9,27 @@ from fastapi import FastAPI
 from clients.http import SyncHttpClient, SyncSupplierClient
 from retry import RetryStrategy
 
+
 logging.config.dictConfig(
     {
         "version": 1,
+        "disable_existing_loggers": False,
         "formatters": {
-            "default": {
-                "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            "json": {
+                "format": "%(message)s",
+                "()": "pythonjsonlogger.jsonlogger.JsonFormatter",
+                "json_indent": 4,
             },
         },
         "handlers": {
             "console": {
                 "class": "logging.StreamHandler",
-                "formatter": "default",
+                "formatter": "json",
             },
         },
         "loggers": {
             "utils.clients.http": {
-                "level": "DEBUG",
+                "level": "INFO",
                 "handlers": ["console"],
             },
         },
