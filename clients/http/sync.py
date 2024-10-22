@@ -217,7 +217,7 @@ class SyncHttpClient:
         if self.request_log_config.request_url:
             extra["request"]["url"] = request.url
         if self.request_log_config.request_headers:
-            extra["request"]["headers"] = request.headers
+            extra["request"]["headers"] = str(dict(request.headers))
         if self.request_log_config.request_body:
             extra["request"]["body"] = request.content.decode()
 
@@ -239,7 +239,7 @@ class SyncHttpClient:
         if self.response_log_config.response_status_code:
             extra["response"]["status_code"] = response.status_code
         if self.response_log_config.response_headers:
-            extra["response"]["headers"] = response.headers
+            extra["response"]["headers"] = str(dict(response.headers))
         if self.response_log_config.response_body:
             extra["response"]["body"] = response.content.decode()
         if self.response_log_config.response_elapsed_time:

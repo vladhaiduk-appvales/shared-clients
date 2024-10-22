@@ -6,9 +6,8 @@ from contextlib import asynccontextmanager
 import uvicorn
 from fastapi import FastAPI
 
-from clients.http import SyncHttpClient, SyncSupplierClient
+from clients.http import SupplierRequestLogConfig, SupplierResponseLogConfig, SyncHttpClient, SyncSupplierClient
 from retry import RetryStrategy
-
 
 logging.config.dictConfig(
     {
@@ -44,7 +43,12 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     SyncHttpClient.configure(base_url="https://httpbin.org", timeout=None)
     SyncHttpClient.open_global()
 
-    SyncSupplierClient.configure(supplier_code="RCL", base_url="https://httpbin.org")
+    SyncSupplierClient.configure(
+        supplier_code="RCL",
+        base_url="https://httpbin.org",
+        request_log_config=SupplierRequestLogConfig(request_headers=True, request_body=True),
+        response_log_config=SupplierResponseLogConfig(response_headers=True, response_body=True),
+    )
     SyncSupplierClient.open_global()
 
     yield
