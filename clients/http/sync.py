@@ -170,6 +170,35 @@ class SyncHttpClient:
         self._local_client.__exit__(exc_type, exc_value, traceback)
         self.close()
 
+    def request_log(self, *, request_name: str, request: httpx.Request) -> tuple[str, dict[str, any] | None]:
+        return f"Sending HTTP request [{request_name}]: {request.method} {request.url}", {
+            "request": {
+                "name": request_name,
+                "method": request.method,
+                "url": request.url,
+                "headers": request.headers,
+                "body": request.content.decode(),
+            },
+        }
+
+    def response_log(self, *, request_name: str, response: httpx.Response) -> tuple[str, dict[str, any] | None]:
+        return (
+            f"HTTP response received [{request_name}]: "
+            f"{response.request.method} {response.request.url} -> {response.status_code}"
+        ), {
+            "request": {
+                "name": request_name,
+                "method": response.request.method,
+                "url": response.request.url,
+            },
+            "response": {
+                "status_code": response.status_code,
+                "headers": response.headers,
+                "body": response.text,
+                "elapsed_time": response.elapsed.total_seconds(),
+            },
+        }
+
     def _send_request(
         self,
         method: MethodType,
@@ -195,35 +224,13 @@ class SyncHttpClient:
             timeout=timeout if timeout is not UNSET else self.timeout,
         )
 
-        http_clients_logger.info(
-            f"Sending HTTP request [{request_name}]: {request.method} {request.url}",
-            extra={
-                "request_name": request_name,
-                "method": request.method,
-                "url": request.url,
-                "headers": request.headers,
-                "body": request.content.decode(),
-            },
-        )
+        request_log_message, request_log_extra = self.request_log(request_name=request_name, request=request)
+        http_clients_logger.info(request_log_message, extra=request_log_extra)
 
         response = self._client.send(request, auth=auth if auth is not UNSET else self.auth)
 
-        http_clients_logger.info(
-            f"HTTP response received [{request_name}]: {request.method} {request.url} -> {response.status_code}",
-            extra={
-                "request": {
-                    "name": request_name,
-                    "method": request.method,
-                    "url": request.url,
-                },
-                "response": {
-                    "status_code": response.status_code,
-                    "headers": response.headers,
-                    "body": response.text,
-                    "elapsed_time": response.elapsed.total_seconds(),
-                },
-            },
-        )
+        response_log_message, response_log_extra = self.response_log(request_name=request_name, response=response)
+        http_clients_logger.info(response_log_message, extra=response_log_extra)
 
         return response
 
