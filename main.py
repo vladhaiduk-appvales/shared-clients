@@ -74,8 +74,6 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     SyncHttpClient.configure(
         base_url="https://httpbin.org",
         timeout=None,
-        # TODO: I've found an issue that SyncSupplierClient uses these settings as well as it takes them from the parent
-        #  -> I need to fix it.
         broker_client=DumbBrokerClient("xxx"),
         broker_message_builder=DumbBrokerMessageBuilder(),
     )

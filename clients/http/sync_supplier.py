@@ -5,11 +5,12 @@ from typing import TYPE_CHECKING
 
 from consts import UNSET, Unset, setattr_if_not_unset
 
-from .sync import HttpRequestLogConfig, HttpResponseLogConfig, SyncHttpClient
+from .sync import HttpClientBrokerMessageBuilder, HttpRequestLogConfig, HttpResponseLogConfig, SyncHttpClient
 
 if TYPE_CHECKING:
     import httpx
 
+    from clients.broker import BrokerClient
     from retry import RetryStrategy
 
     from .types_ import (
@@ -40,8 +41,23 @@ class SupplierResponseLogConfig(HttpResponseLogConfig):
 class SyncSupplierClient(SyncHttpClient):
     supplier_code: str | None = None
 
+    # We redefine all class-level attributes to stop them from taking values from the parent class.
+    base_url: UrlType | None = None
+    base_params: ParamsType | None = None
+    base_headers: ParamsType | None = None
+    cookies: CookiesType | None = None
+    auth: httpx.Auth | None = None
+    proxy: ProxyType | None = None
+    cert: CertType | None = None
+    timeout: TimeoutType | None = 5.0
+
+    retry_strategy: RetryStrategy | None = None
     request_log_config: SupplierRequestLogConfig = SupplierRequestLogConfig()
     response_log_config: SupplierResponseLogConfig = SupplierResponseLogConfig()
+    broker_client: BrokerClient | None = None
+    broker_message_builder: HttpClientBrokerMessageBuilder | None = None
+
+    _global_client: httpx.Client | None = None
 
     def __init__(
         self,
