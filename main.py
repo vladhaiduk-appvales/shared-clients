@@ -91,6 +91,8 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
         broker_client=SQSClient(
             queue_url="http://sqs.eu-north-1.localhost.localstack.cloud:4566/000000000000/UtilsQueue",
             region_name="eu-north-1",
+            log_attributes=True,
+            log_body=True,
             singleton=True,
         ),
         broker_message_builder=SupplierSQSMessageBuilder(),

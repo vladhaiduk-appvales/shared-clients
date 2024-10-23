@@ -34,11 +34,18 @@ class SQSClientMeta(OptionalSingletonMeta, ABCMeta):
 
 
 class SQSClient(BrokerClient, metaclass=SQSClientMeta):
-    def __init__(self, queue_url: str, region_name: str) -> None:
+    def __init__(
+        self, queue_url: str, region_name: str, *, log_attributes: bool = False, log_body: bool = False
+    ) -> None:
         super().__init__(queue_url)
+
+        self.region_name = region_name
+        self.log_attributes = log_attributes
+        self.log_body = log_body
+
         self._client = boto3.client(
             "sqs",
-            region_name=region_name,
+            region_name=self.region_name,
             # TODO: Remove this in prod.
             endpoint_url="http://localhost:4566",
         )
@@ -50,12 +57,27 @@ class SQSClient(BrokerClient, metaclass=SQSClientMeta):
                 MessageAttributes=message.metadata,
                 MessageBody=message.body,
             )
-        except (BotoCoreError, ClientError) as error:
-            # TODO: Improve logs.
-            broker_clients_logger.error("Failed to send SQS message", exc_info=error)
+        except ClientError as error:
+            error_code = error.response["Error"]["Code"]
+            error_message = error.response["Error"]["Message"]
+            broker_clients_logger.error(
+                f"Failed to send SQS message due to ClientError: {error_code} - {error_message}",
+                exc_info=True,
+                extra={"error": {"code": error_code, "message": error_message}},
+            )
+            return None
+        except BotoCoreError:
+            broker_clients_logger.error("Failed to send SQS message due to BotoCoreError", exc_info=True)
             return None
         else:
-            broker_clients_logger.info("Successfully sent SQS message")
+            extra = {}
+
+            if self.log_attributes:
+                extra["attributes"] = message.metadata
+            if self.log_body:
+                extra["body"] = message.body
+
+            broker_clients_logger.info("Sent SQS message successfully", extra=extra)
             return response
 
 

@@ -17,7 +17,7 @@ awslocal sqs get-queue-url --queue-name UtilsQueue
 To read messages:
 
 ```shell
-awslocal sqs receive-message --queue-url <queue-url> --max-number-of-messages 10
+awslocal sqs receive-message --queue-url <queue-url> --max-number-of-messages 10 --message-attribute-names All --attribute-names All
 ```
 
 To clear messages:
