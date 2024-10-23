@@ -51,7 +51,7 @@ class HttpResponseLogConfig:
     response_elapsed_time: bool = True
 
 
-class HttpClientBrokerMessageBuilder(BrokerMessageBuilder):
+class BrokerHttpMessageBuilder(BrokerMessageBuilder):
     @abstractmethod
     def build_metadata(
         self, request: httpx.Request, response: httpx.Response, details: DetailsType | None = None
@@ -86,7 +86,7 @@ class SyncHttpClient:
     request_log_config: HttpRequestLogConfig = HttpRequestLogConfig()
     response_log_config: HttpResponseLogConfig = HttpResponseLogConfig()
     broker_client: BrokerClient | None = None
-    broker_message_builder: HttpClientBrokerMessageBuilder | None = None
+    broker_message_builder: BrokerHttpMessageBuilder | None = None
 
     _global_client: httpx.Client | None = None
 
@@ -105,7 +105,7 @@ class SyncHttpClient:
         request_log_config: HttpRequestLogConfig | None | Unset = UNSET,
         response_log_config: HttpResponseLogConfig | Unset = UNSET,
         broker_client: BrokerClient | None | Unset = UNSET,
-        broker_message_builder: HttpClientBrokerMessageBuilder | None | Unset = UNSET,
+        broker_message_builder: BrokerHttpMessageBuilder | None | Unset = UNSET,
     ) -> None:
         # Instance-level attributes do not delete class-level attributes; they simply shadow them.
         setattr_if_not_unset(self, "base_url", base_url)
@@ -141,7 +141,7 @@ class SyncHttpClient:
         request_log_config: HttpRequestLogConfig | None | Unset = UNSET,
         response_log_config: HttpResponseLogConfig | Unset = UNSET,
         broker_client: BrokerClient | None | Unset = UNSET,
-        broker_message_builder: HttpClientBrokerMessageBuilder | None | Unset = UNSET,
+        broker_message_builder: BrokerHttpMessageBuilder | None | Unset = UNSET,
     ) -> SyncHttpClient:
         setattr_if_not_unset(cls, "base_url", base_url)
         setattr_if_not_unset(cls, "base_params", base_params)

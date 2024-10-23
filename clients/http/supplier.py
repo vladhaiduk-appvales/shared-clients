@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 
 from consts import UNSET, Unset, setattr_if_not_unset
 
-from .sync import HttpClientBrokerMessageBuilder, HttpRequestLogConfig, HttpResponseLogConfig, SyncHttpClient
+from .base import BrokerHttpMessageBuilder, HttpRequestLogConfig, HttpResponseLogConfig, SyncHttpClient
 
 if TYPE_CHECKING:
     import httpx
@@ -55,7 +55,7 @@ class SyncSupplierClient(SyncHttpClient):
     request_log_config: SupplierRequestLogConfig = SupplierRequestLogConfig()
     response_log_config: SupplierResponseLogConfig = SupplierResponseLogConfig()
     broker_client: BrokerClient | None = None
-    broker_message_builder: HttpClientBrokerMessageBuilder | None = None
+    broker_message_builder: BrokerHttpMessageBuilder | None = None
 
     _global_client: httpx.Client | None = None
 

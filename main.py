@@ -10,8 +10,7 @@ from fastapi import FastAPI
 
 from clients.broker import BrokerClient, BrokerMessage
 from clients.http import (
-    DetailsType,
-    HttpClientBrokerMessageBuilder,
+    BrokerHttpMessageBuilder,
     Request,
     Response,
     SupplierRequestLogConfig,
@@ -23,6 +22,8 @@ from retry import RetryStrategy
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
+
+    from clients.http.types_ import DetailsType
 
 logging.config.dictConfig(
     {
@@ -57,7 +58,7 @@ class DumbBrokerClient(BrokerClient):
         print(message)
 
 
-class DumbBrokerMessageBuilder(HttpClientBrokerMessageBuilder):
+class DumbBrokerMessageBuilder(BrokerHttpMessageBuilder):
     def build_metadata(
         self, _request: Request, _response: Response, details: DetailsType | None = None
     ) -> dict[str, any] | None:
