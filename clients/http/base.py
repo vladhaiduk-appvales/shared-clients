@@ -54,12 +54,12 @@ class HttpResponseLogConfig:
 class BrokerHttpMessageBuilder(BrokerMessageBuilder):
     @abstractmethod
     def build_metadata(
-        self, request: httpx.Request, response: httpx.Response, details: DetailsType | None = None
+        self, request: httpx.Request, response: httpx.Response, details: DetailsType
     ) -> dict[str, any] | None:
         pass
 
     @abstractmethod
-    def build_body(self, request: httpx.Request, response: httpx.Response, details: DetailsType | None = None) -> str:
+    def build_body(self, request: httpx.Request, response: httpx.Response, details: DetailsType) -> str:
         pass
 
 
@@ -212,10 +212,10 @@ class SyncHttpClient:
         self._local_client.__exit__(exc_type, exc_value, traceback)
         self.close()
 
-    def request_log(self, *, request: httpx.Request, details: DetailsType | None = None) -> tuple[str, dict[str, any]]:
+    def request_log(self, request: httpx.Request, details: DetailsType) -> tuple[str, dict[str, any]]:
         extra = {"request": {}}
 
-        request_name = details.get("request_name")
+        request_name = details["request_name"]
 
         if self.request_log_config.request_name:
             extra["request"]["name"] = request_name
@@ -233,12 +233,10 @@ class SyncHttpClient:
 
         return f"Sending HTTP request [{request_name}]: {request.method} {request.url}", extra
 
-    def response_log(
-        self, *, response: httpx.Response, details: DetailsType | None = None
-    ) -> tuple[str, dict[str, any]]:
+    def response_log(self, response: httpx.Response, details: DetailsType) -> tuple[str, dict[str, any]]:
         extra = {"request": {}, "response": {}}
 
-        request_name = details.get("request_name")
+        request_name = details["request_name"]
 
         if self.response_log_config.request_name:
             extra["request"]["name"] = request_name
@@ -278,7 +276,7 @@ class SyncHttpClient:
         content: ContentBodyType | None = None,
         json: JsonBodyType | None = None,
         timeout: TimeoutType | None | Unset = UNSET,
-        details: DetailsType | None = None,
+        details: DetailsType,
     ) -> httpx.Response:
         request = self._client.build_request(
             method,
@@ -290,12 +288,12 @@ class SyncHttpClient:
             timeout=timeout if timeout is not UNSET else self.timeout,
         )
 
-        request_log_message, request_log_extra = self.request_log(request=request, details=details)
+        request_log_message, request_log_extra = self.request_log(request, details)
         http_clients_logger.info(request_log_message, extra=request_log_extra)
 
         response = self._client.send(request, auth=auth if auth is not UNSET else self.auth)
 
-        response_log_message, response_log_extra = self.response_log(response=response, details=details)
+        response_log_message, response_log_extra = self.response_log(response, details)
         http_clients_logger.info(response_log_message, extra=response_log_extra)
 
         return response

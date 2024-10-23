@@ -46,12 +46,10 @@ class SQSSupplierMessageBuilder(BrokerHttpMessageBuilder, SQSMessageBuilder):
     """A specific implementation of the SQSMessageBuilder for the raw-supplier-message-storage service."""
 
     def build_metadata(
-        self, _request: httpx.Request, _response: httpx.Response, details: DetailsType | None = None
+        self, _request: httpx.Request, _response: httpx.Response, details: DetailsType
     ) -> dict[str, any] | None:
-        details = details or {}
-
-        request_name = details.get("request_name")
-        supplier_code = details.get("supplier_code")
+        request_name = details["request_name"]
+        supplier_code = details["supplier_code"]
         # TODO: I need to inject the trace_id into the details.
         trace_id = details.get("trace_id")
         timestamp = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
@@ -77,7 +75,7 @@ class SQSSupplierMessageBuilder(BrokerHttpMessageBuilder, SQSMessageBuilder):
 
         return attributes
 
-    def build_body(self, request: httpx.Request, response: httpx.Response, _details: DetailsType | None = None) -> str:
+    def build_body(self, request: httpx.Request, response: httpx.Response, _details: DetailsType) -> str:
         request_text = request.content.decode()
         request_text = mask_card_number(mask_series_code(request_text))
 
@@ -183,24 +181,22 @@ class SyncSupplierClient(SyncHttpClient):
             broker_message_builder=broker_message_builder,
         )
 
-    def request_log(self, *, request: httpx.Request, details: DetailsType | None = None) -> tuple[str, dict[str, any]]:
+    def request_log(self, request: httpx.Request, details: DetailsType) -> tuple[str, dict[str, any]]:
         message, extra = super().request_log(request=request, details=details)
         header, body = message.split(":", maxsplit=1)
 
-        supplier_code = details.get("supplier_code")
+        supplier_code = details["supplier_code"]
 
         if self.request_log_config.supplier_code:
             extra["supplier_code"] = supplier_code
 
         return f"{header} to [{supplier_code}] supplier:{body}", extra
 
-    def response_log(
-        self, *, response: httpx.Response, details: DetailsType | None = None
-    ) -> tuple[str, dict[str, any]]:
+    def response_log(self, response: httpx.Response, details: DetailsType) -> tuple[str, dict[str, any]]:
         message, extra = super().response_log(response=response, details=details)
         header, body = message.split(":", maxsplit=1)
 
-        supplier_code = details.get("supplier_code")
+        supplier_code = details["supplier_code"]
 
         if self.request_log_config.supplier_code:
             extra["supplier_code"] = supplier_code
@@ -213,7 +209,7 @@ class SyncSupplierClient(SyncHttpClient):
         url: UrlType,
         *,
         name: str | None = None,
-        supplier_code: str | None = None,
+        supplier_code: str | None | Unset = UNSET,
         params: ParamsType | None = None,
         headers: HeadersType | None = None,
         auth: httpx.Auth | None | Unset = UNSET,
@@ -226,7 +222,7 @@ class SyncSupplierClient(SyncHttpClient):
         details = details or {}
 
         if "supplier_code" not in details:
-            details["supplier_code"] = supplier_code or self.supplier_code or "UNKNOWN"
+            details["supplier_code"] = supplier_code if supplier_code is not UNSET else self.supplier_code or "UNKNOWN"
 
         return super().request(
             method,
@@ -247,7 +243,7 @@ class SyncSupplierClient(SyncHttpClient):
         url: UrlType,
         *,
         name: str | None = None,
-        supplier_code: str | None = None,
+        supplier_code: str | None | Unset = UNSET,
         params: ParamsType | None = None,
         headers: HeadersType | None = None,
         auth: httpx.Auth | None | Unset = UNSET,
@@ -273,7 +269,7 @@ class SyncSupplierClient(SyncHttpClient):
         url: UrlType,
         *,
         name: str | None = None,
-        supplier_code: str | None = None,
+        supplier_code: str | None | Unset = UNSET,
         params: ParamsType | None = None,
         headers: HeadersType | None = None,
         auth: httpx.Auth | None | Unset = UNSET,
@@ -303,7 +299,7 @@ class SyncSupplierClient(SyncHttpClient):
         url: UrlType,
         *,
         name: str | None = None,
-        supplier_code: str | None = None,
+        supplier_code: str | None | Unset = UNSET,
         params: ParamsType | None = None,
         headers: HeadersType | None = None,
         auth: httpx.Auth | None | Unset = UNSET,
@@ -333,7 +329,7 @@ class SyncSupplierClient(SyncHttpClient):
         url: UrlType,
         *,
         name: str | None = None,
-        supplier_code: str | None = None,
+        supplier_code: str | None | Unset = UNSET,
         params: ParamsType | None = None,
         headers: HeadersType | None = None,
         auth: httpx.Auth | None | Unset = UNSET,
@@ -363,7 +359,7 @@ class SyncSupplierClient(SyncHttpClient):
         url: UrlType,
         *,
         name: str | None = None,
-        supplier_code: str | None = None,
+        supplier_code: str | None | Unset = UNSET,
         params: ParamsType | None = None,
         headers: HeadersType | None = None,
         auth: httpx.Auth | None | Unset = UNSET,
