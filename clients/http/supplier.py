@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import datetime as dt
+import json
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from clients.broker import SQSMessageBuilder
 from consts import UNSET, Unset, setattr_if_not_unset
+from utils.text import compress_and_encode, mask_card_number, mask_series_code
 
 from .base import BrokerHttpMessageBuilder, HttpRequestLogConfig, HttpResponseLogConfig, SyncHttpClient
 
@@ -36,6 +40,53 @@ class SupplierRequestLogConfig(HttpRequestLogConfig):
 @dataclass
 class SupplierResponseLogConfig(HttpResponseLogConfig):
     supplier_code: bool = True
+
+
+class SQSSupplierMessageBuilder(BrokerHttpMessageBuilder, SQSMessageBuilder):
+    """A specific implementation of the SQSMessageBuilder for the raw-supplier-message-storage service."""
+
+    def build_metadata(
+        self, _request: httpx.Request, _response: httpx.Response, details: DetailsType | None = None
+    ) -> dict[str, any] | None:
+        details = details or {}
+
+        request_name = details.get("request_name")
+        supplier_code = details.get("supplier_code")
+        # TODO: I need to inject the trace_id into the details.
+        trace_id = details.get("trace_id")
+        timestamp = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
+        attributes = {
+            "MessageType": self.string_attr(request_name),
+            "SupplierCode": self.string_attr(supplier_code),
+            "TraceId": self.string_attr(trace_id),
+            "TimeStamp": self.string_attr(timestamp),
+        }
+
+        if tenant_id := details.get("tenant_id"):
+            attributes["TenantId"] = self.string_attr(tenant_id)
+
+        if tenant_name := details.get("tenant_name"):
+            attributes["TenantName"] = self.string_attr(tenant_name)
+
+        if order_id := details.get("order_id"):
+            attributes["OrderId"] = self.string_attr(order_id)
+
+        if booking_ref := details.get("booking_ref"):
+            attributes["BookingRef"] = self.string_attr(booking_ref)
+
+        return attributes
+
+    def build_body(self, request: httpx.Request, response: httpx.Response, _details: DetailsType | None = None) -> str:
+        request_text = request.content.decode()
+        request_text = mask_card_number(mask_series_code(request_text))
+
+        return json.dumps(
+            {
+                "request": compress_and_encode(request_text),
+                "response": compress_and_encode(response.content),
+            }
+        )
 
 
 class SyncSupplierClient(SyncHttpClient):

@@ -15,11 +15,11 @@ class SQSMessageBuilder(BrokerMessageBuilder):
     def number_attr(self, value: int) -> dict[str, any]:
         return {"DataType": "Number", "StringValue": str(value)}
 
-    def string_attr(self, value: str) -> dict[str, any]:
-        return {"DataType": "String", "StringValue": value}
+    def string_attr(self, value: any) -> dict[str, any]:
+        return {"DataType": "String", "StringValue": str(value)}
 
-    def string_list_attr(self, values: list[str]) -> dict[str, any]:
-        return {"DataType": "String", "StringListValues": values}
+    def string_list_attr(self, values: list[any]) -> dict[str, any]:
+        return {"DataType": "String", "StringListValues": [str(value) for value in values]}
 
     def binary_attr(self, value: bytes) -> dict[str, any]:
         return {"DataType": "Binary", "BinaryValue": value}

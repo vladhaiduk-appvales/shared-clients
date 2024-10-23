@@ -6,7 +6,7 @@ router = APIRouter(prefix="/supplier")
 
 
 @router.get("/global")
-async def sync_supplier_global_usecase() -> dict:
+async def global_usecase() -> dict:
     client = SyncSupplierClient()
 
     response = client.get("/get")
@@ -15,7 +15,7 @@ async def sync_supplier_global_usecase() -> dict:
 
 
 @router.get("/local")
-async def sync_supplier_local_usecase() -> dict:
+async def local_usecase() -> dict:
     client = SyncSupplierClient()
 
     client.open()
@@ -26,7 +26,7 @@ async def sync_supplier_local_usecase() -> dict:
 
 
 @router.get("/local/custom_supplier_code")
-async def sync_supplier_local__usecase(supplier_code: str) -> dict:
+async def local_custom_supplier_code_usecase(supplier_code: str) -> dict:
     client = SyncSupplierClient()
 
     client.open()

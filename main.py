@@ -8,11 +8,9 @@ from typing import TYPE_CHECKING
 import uvicorn
 from fastapi import FastAPI
 
-from clients.broker import SQSClient, SQSMessageBuilder
+from clients.broker import SQSClient
 from clients.http import (
-    BrokerHttpMessageBuilder,
-    Request,
-    Response,
+    SQSSupplierMessageBuilder,
     SupplierRequestLogConfig,
     SupplierResponseLogConfig,
     SyncHttpClient,
@@ -23,7 +21,6 @@ from routers import http_client_router, supplier_client_router
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
-    from clients.http.types_ import DetailsType
 
 logging.config.dictConfig(
     {
@@ -56,20 +53,6 @@ logging.config.dictConfig(
 )
 
 
-class SupplierSQSMessageBuilder(BrokerHttpMessageBuilder, SQSMessageBuilder):
-    def build_metadata(
-        self, _request: Request, _response: Response, details: DetailsType | None = None
-    ) -> dict[str, any] | None:
-        supplier_code = details.get("supplier_code")
-        return {
-            "SupplierCode": self.string_attr(supplier_code),
-        }
-
-    def build_body(self, _request: Request, _response: Response, details: DetailsType | None = None) -> str:
-        supplier_code = details.get("supplier_code")
-        return f"Hello from {supplier_code} :D"
-
-
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     print("Startup")
@@ -95,7 +78,7 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
             log_body=True,
             singleton=True,
         ),
-        broker_message_builder=SupplierSQSMessageBuilder(),
+        broker_message_builder=SQSSupplierMessageBuilder(),
     )
     SyncSupplierClient.open_global()
 
