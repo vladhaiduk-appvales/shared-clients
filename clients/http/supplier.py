@@ -74,6 +74,8 @@ class SyncSupplierClient(SyncHttpClient):
         retry_strategy: RetryStrategy | None | Unset = UNSET,
         request_log_config: SupplierRequestLogConfig | None | Unset = UNSET,
         response_log_config: SupplierResponseLogConfig | Unset = UNSET,
+        broker_client: BrokerClient | None | Unset = UNSET,
+        broker_message_builder: BrokerHttpMessageBuilder | None | Unset = UNSET,
     ) -> None:
         setattr_if_not_unset(self, "supplier_code", supplier_code)
 
@@ -89,6 +91,8 @@ class SyncSupplierClient(SyncHttpClient):
             retry_strategy=retry_strategy,
             request_log_config=request_log_config,
             response_log_config=response_log_config,
+            broker_client=broker_client,
+            broker_message_builder=broker_message_builder,
         )
 
     @classmethod
@@ -107,6 +111,8 @@ class SyncSupplierClient(SyncHttpClient):
         retry_strategy: RetryStrategy | None | Unset = UNSET,
         request_log_config: SupplierRequestLogConfig | None | Unset = UNSET,
         response_log_config: SupplierResponseLogConfig | Unset = UNSET,
+        broker_client: BrokerClient | None | Unset = UNSET,
+        broker_message_builder: BrokerHttpMessageBuilder | None | Unset = UNSET,
     ) -> None:
         setattr_if_not_unset(cls, "supplier_code", supplier_code)
 
@@ -122,6 +128,8 @@ class SyncSupplierClient(SyncHttpClient):
             retry_strategy=retry_strategy,
             request_log_config=request_log_config,
             response_log_config=response_log_config,
+            broker_client=broker_client,
+            broker_message_builder=broker_message_builder,
         )
 
     def request_log(self, *, request: httpx.Request, details: DetailsType | None = None) -> tuple[str, dict[str, any]]:

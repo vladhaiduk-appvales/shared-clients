@@ -18,8 +18,14 @@ class SQSMessageBuilder(BrokerMessageBuilder):
     def string_attr(self, value: str) -> dict[str, any]:
         return {"DataType": "String", "StringValue": value}
 
+    def string_list_attr(self, values: list[str]) -> dict[str, any]:
+        return {"DataType": "String", "StringListValues": values}
+
     def binary_attr(self, value: bytes) -> dict[str, any]:
         return {"DataType": "Binary", "BinaryValue": value}
+
+    def binary_list_attr(self, values: list[bytes]) -> dict[str, any]:
+        return {"DataType": "Binary", "BinaryListValues": values}
 
 
 # It's necessary to prevent conflicts with the inheritance of BrokerClient and the use of OptionalSingletonMeta.
@@ -30,18 +36,27 @@ class SQSClientMeta(OptionalSingletonMeta, ABCMeta):
 class SQSClient(BrokerClient, metaclass=SQSClientMeta):
     def __init__(self, queue_url: str, region_name: str) -> None:
         super().__init__(queue_url)
-        self._client = boto3.client("sqs", region_name=region_name)
+        self._client = boto3.client(
+            "sqs",
+            region_name=region_name,
+            # TODO: Remove this in prod.
+            endpoint_url="http://localhost:4566",
+        )
 
     def send_message(self, message: BrokerMessage) -> any:
         try:
-            return self._client.send_message(
+            response = self._client.send_message(
                 QueueUrl=self.queue_url,
                 MessageAttributes=message.metadata,
                 MessageBody=message.body,
             )
         except (BotoCoreError, ClientError) as error:
+            # TODO: Improve logs.
             broker_clients_logger.error("Failed to send SQS message", exc_info=error)
             return None
+        else:
+            broker_clients_logger.info("Successfully sent SQS message")
+            return response
 
 
 if __name__ == "__main__":
