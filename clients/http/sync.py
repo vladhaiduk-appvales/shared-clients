@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from abc import abstractmethod
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import httpx
 
+from clients.broker import BrokerClient, BrokerMessageBuilder
 from consts import UNSET, Unset, setattr_if_not_unset
 from loggers import http_clients_logger
 
@@ -49,6 +51,20 @@ class HttpResponseLogConfig:
     response_elapsed_time: bool = True
 
 
+class HttpClientBrokerMessageBuilder(BrokerMessageBuilder):
+    @abstractmethod
+    def build_metadata(
+        self, request: httpx.Request, response: httpx.Response, details: DetailsType | None = None
+    ) -> dict[str, any] | None:
+        pass
+
+    @abstractmethod
+    def build_body(
+        self, request: httpx.Request, response: httpx.Response, details: DetailsType | None = None
+    ) -> any | None:
+        pass
+
+
 class SyncHttpClient:
     """A wrapper around the HTTPX Client, designed to streamline and extend its functionality to meet our needs.
 
@@ -65,10 +81,12 @@ class SyncHttpClient:
     proxy: ProxyType | None = None
     cert: CertType | None = None
     timeout: TimeoutType | None = 5.0
-    retry_strategy: RetryStrategy | None = None
 
+    retry_strategy: RetryStrategy | None = None
     request_log_config: HttpRequestLogConfig = HttpRequestLogConfig()
     response_log_config: HttpResponseLogConfig = HttpResponseLogConfig()
+    broker_client: BrokerClient | None = None
+    broker_message_builder: HttpClientBrokerMessageBuilder | None = None
 
     _global_client: httpx.Client | None = None
 
@@ -86,6 +104,8 @@ class SyncHttpClient:
         retry_strategy: RetryStrategy | None | Unset = UNSET,
         request_log_config: HttpRequestLogConfig | None | Unset = UNSET,
         response_log_config: HttpResponseLogConfig | Unset = UNSET,
+        broker_client: BrokerClient | None | Unset = UNSET,
+        broker_message_builder: HttpClientBrokerMessageBuilder | None | Unset = UNSET,
     ) -> None:
         # Instance-level attributes do not delete class-level attributes; they simply shadow them.
         setattr_if_not_unset(self, "base_url", base_url)
@@ -96,9 +116,12 @@ class SyncHttpClient:
         setattr_if_not_unset(self, "proxy", proxy)
         setattr_if_not_unset(self, "cert", cert)
         setattr_if_not_unset(self, "timeout", timeout)
+
         setattr_if_not_unset(self, "retry_strategy", retry_strategy)
         setattr_if_not_unset(self, "request_log_config", request_log_config)
         setattr_if_not_unset(self, "response_log_config", response_log_config)
+        setattr_if_not_unset(self, "broker_client", broker_client)
+        setattr_if_not_unset(self, "broker_message_builder", broker_message_builder)
 
         self._local_client: httpx.Client | None = None
 
@@ -117,6 +140,8 @@ class SyncHttpClient:
         retry_strategy: RetryStrategy | None | Unset = UNSET,
         request_log_config: HttpRequestLogConfig | None | Unset = UNSET,
         response_log_config: HttpResponseLogConfig | Unset = UNSET,
+        broker_client: BrokerClient | None | Unset = UNSET,
+        broker_message_builder: HttpClientBrokerMessageBuilder | None | Unset = UNSET,
     ) -> SyncHttpClient:
         setattr_if_not_unset(cls, "base_url", base_url)
         setattr_if_not_unset(cls, "base_params", base_params)
@@ -126,9 +151,12 @@ class SyncHttpClient:
         setattr_if_not_unset(cls, "proxy", proxy)
         setattr_if_not_unset(cls, "cert", cert)
         setattr_if_not_unset(cls, "timeout", timeout)
+
         setattr_if_not_unset(cls, "retry_strategy", retry_strategy)
         setattr_if_not_unset(cls, "request_log_config", request_log_config)
         setattr_if_not_unset(cls, "response_log_config", response_log_config)
+        setattr_if_not_unset(cls, "broker_client", broker_client)
+        setattr_if_not_unset(cls, "broker_message_builder", broker_message_builder)
 
     @classmethod
     def open_global(cls) -> None:
@@ -307,11 +335,18 @@ class SyncHttpClient:
         }
 
         retry_strategy = retry_strategy if retry_strategy is not UNSET else self.retry_strategy
-        return (
+        response = (
             retry_strategy.retry(self._send_request, **request_kwargs)
             if retry_strategy
             else self._send_request(**request_kwargs)
         )
+
+        if self.broker_client and self.broker_message_builder:
+            message = self.broker_message_builder.build(response.request, response, details)
+            if message:
+                self.broker_client.send_message(message=message)
+
+        return response
 
     def get(
         self,

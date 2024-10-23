@@ -1,13 +1,28 @@
+from __future__ import annotations
+
 import logging
 import logging.config
-from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from typing import TYPE_CHECKING
 
 import uvicorn
 from fastapi import FastAPI
 
-from clients.http import SupplierRequestLogConfig, SupplierResponseLogConfig, SyncHttpClient, SyncSupplierClient
+from clients.broker import BrokerClient, BrokerMessage
+from clients.http import (
+    DetailsType,
+    HttpClientBrokerMessageBuilder,
+    Request,
+    Response,
+    SupplierRequestLogConfig,
+    SupplierResponseLogConfig,
+    SyncHttpClient,
+    SyncSupplierClient,
+)
 from retry import RetryStrategy
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
 
 logging.config.dictConfig(
     {
@@ -36,11 +51,34 @@ logging.config.dictConfig(
 )
 
 
+class DumbBrokerClient(BrokerClient):
+    def send_message(self, message: BrokerMessage) -> None:
+        print("+++ DumbBrokerClient +++")
+        print(message)
+
+
+class DumbBrokerMessageBuilder(HttpClientBrokerMessageBuilder):
+    def build_metadata(
+        self, _request: Request, _response: Response, details: DetailsType | None = None
+    ) -> dict[str, any] | None:
+        return {"request_name": details.get("request_name")}
+
+    def build_body(self, _request: Request, _response: Response, details: DetailsType | None = None) -> any | None:
+        return details.get("request_name")
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     print("Startup")
 
-    SyncHttpClient.configure(base_url="https://httpbin.org", timeout=None)
+    SyncHttpClient.configure(
+        base_url="https://httpbin.org",
+        timeout=None,
+        # TODO: I've found an issue that SyncSupplierClient uses these settings as well as it takes them from the parent
+        #  -> I need to fix it.
+        broker_client=DumbBrokerClient("xxx"),
+        broker_message_builder=DumbBrokerMessageBuilder(),
+    )
     SyncHttpClient.open_global()
 
     SyncSupplierClient.configure(
