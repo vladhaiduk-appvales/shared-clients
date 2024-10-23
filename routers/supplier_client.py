@@ -9,7 +9,7 @@ router = APIRouter(prefix="/supplier")
 async def global_usecase() -> dict:
     client = SyncSupplierClient()
 
-    response = client.get("/get")
+    response = client.get("/get", name="GLOBAL")
 
     return response.json()
 
@@ -19,7 +19,7 @@ async def local_usecase() -> dict:
     client = SyncSupplierClient()
 
     client.open()
-    response = client.get("/get")
+    response = client.get("/get", name="LOCAL")
     client.close()
 
     return response.json()
@@ -30,7 +30,7 @@ async def local_custom_supplier_code_usecase(supplier_code: str) -> dict:
     client = SyncSupplierClient()
 
     client.open()
-    response = client.get("/get", supplier_code=supplier_code)
+    response = client.get("/get", name="LOCAL_CUSTOM_SUPPLIER_CODE", supplier_code=supplier_code)
     client.close()
 
     return response.json()

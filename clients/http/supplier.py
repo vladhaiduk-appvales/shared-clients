@@ -45,8 +45,14 @@ class SupplierResponseLogConfig(HttpResponseLogConfig):
 class SQSSupplierMessageBuilder(BrokerHttpMessageBuilder, SQSMessageBuilder):
     """A specific implementation of the SQSMessageBuilder for the raw-supplier-message-storage service."""
 
+    def __init__(self, *, allowed_request_names: set[str] | None = None) -> None:
+        self.allowed_request_names = allowed_request_names or set()
+
+    def filter(self, request: httpx.Request, response: httpx.Response, details: DetailsType) -> bool:
+        return details["request_name"] in self.allowed_request_names
+
     def build_metadata(
-        self, _request: httpx.Request, _response: httpx.Response, details: DetailsType
+        self, request: httpx.Request, response: httpx.Response, details: DetailsType
     ) -> dict[str, any] | None:
         request_name = details["request_name"]
         supplier_code = details["supplier_code"]
@@ -75,7 +81,7 @@ class SQSSupplierMessageBuilder(BrokerHttpMessageBuilder, SQSMessageBuilder):
 
         return attributes
 
-    def build_body(self, request: httpx.Request, response: httpx.Response, _details: DetailsType) -> str:
+    def build_body(self, request: httpx.Request, response: httpx.Response, details: DetailsType) -> str:
         request_text = request.content.decode()
         request_text = mask_card_number(mask_series_code(request_text))
 

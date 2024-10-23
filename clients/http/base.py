@@ -52,6 +52,9 @@ class HttpResponseLogConfig:
 
 
 class BrokerHttpMessageBuilder(BrokerMessageBuilder):
+    def filter(self, request: httpx.Request, response: httpx.Response, details: DetailsType) -> bool:
+        return True
+
     @abstractmethod
     def build_metadata(
         self, request: httpx.Request, response: httpx.Response, details: DetailsType

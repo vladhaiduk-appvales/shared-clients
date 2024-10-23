@@ -14,7 +14,10 @@ class BrokerMessageBuilder(ABC):
     def build(self, *args: any, **kwargs: any) -> BrokerMessage | None:
         metadata = self.build_metadata(*args, **kwargs)
         body = self.build_body(*args, **kwargs)
-        return BrokerMessage(metadata=metadata, body=body) if metadata or body else None
+        return BrokerMessage(metadata=metadata, body=body) if self.filter(*args, **kwargs) else None
+
+    def filter(self, *args: any, **kwargs: any) -> bool:
+        return True
 
     @abstractmethod
     def build_metadata(self, *args: any, **kwargs: any) -> dict[str, any] | None:
