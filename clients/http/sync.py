@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 
 import httpx
 
-from consts import UNSET, Unset
+from consts import UNSET, Unset, setattr_if_not_unset
 from loggers import http_clients_logger
 
 if TYPE_CHECKING:
@@ -88,28 +88,17 @@ class SyncHttpClient:
         response_log_config: HttpResponseLogConfig | Unset = UNSET,
     ) -> None:
         # Instance-level attributes do not delete class-level attributes; they simply shadow them.
-        if base_url is not UNSET:
-            self.base_url = base_url
-        if base_params is not UNSET:
-            self.base_params = base_params
-        if base_headers is not UNSET:
-            self.base_headers = base_headers
-        if cookies is not UNSET:
-            self.cookies = cookies
-        if auth is not UNSET:
-            self.auth = auth
-        if proxy is not UNSET:
-            self.proxy = proxy
-        if cert is not UNSET:
-            self.cert = cert
-        if timeout is not UNSET:
-            self.timeout = timeout
-        if retry_strategy is not UNSET:
-            self.retry_strategy = retry_strategy
-        if request_log_config is not UNSET:
-            self.request_log_config = request_log_config
-        if response_log_config is not UNSET:
-            self.response_log_config = response_log_config
+        setattr_if_not_unset(self, "base_url", base_url)
+        setattr_if_not_unset(self, "base_params", base_params)
+        setattr_if_not_unset(self, "base_headers", base_headers)
+        setattr_if_not_unset(self, "cookies", cookies)
+        setattr_if_not_unset(self, "auth", auth)
+        setattr_if_not_unset(self, "proxy", proxy)
+        setattr_if_not_unset(self, "cert", cert)
+        setattr_if_not_unset(self, "timeout", timeout)
+        setattr_if_not_unset(self, "retry_strategy", retry_strategy)
+        setattr_if_not_unset(self, "request_log_config", request_log_config)
+        setattr_if_not_unset(self, "response_log_config", response_log_config)
 
         self._local_client: httpx.Client | None = None
 
@@ -129,28 +118,17 @@ class SyncHttpClient:
         request_log_config: HttpRequestLogConfig | None | Unset = UNSET,
         response_log_config: HttpResponseLogConfig | Unset = UNSET,
     ) -> SyncHttpClient:
-        if base_url is not UNSET:
-            cls.base_url = base_url
-        if base_params is not UNSET:
-            cls.base_params = base_params
-        if base_headers is not UNSET:
-            cls.base_headers = base_headers
-        if cookies is not UNSET:
-            cls.cookies = cookies
-        if auth is not UNSET:
-            cls.auth = auth
-        if proxy is not UNSET:
-            cls.proxy = proxy
-        if cert is not UNSET:
-            cls.cert = cert
-        if timeout is not UNSET:
-            cls.timeout = timeout
-        if retry_strategy is not UNSET:
-            cls.retry_strategy = retry_strategy
-        if request_log_config is not UNSET:
-            cls.request_log_config = request_log_config
-        if response_log_config is not UNSET:
-            cls.response_log_config = response_log_config
+        setattr_if_not_unset(cls, "base_url", base_url)
+        setattr_if_not_unset(cls, "base_params", base_params)
+        setattr_if_not_unset(cls, "base_headers", base_headers)
+        setattr_if_not_unset(cls, "cookies", cookies)
+        setattr_if_not_unset(cls, "auth", auth)
+        setattr_if_not_unset(cls, "proxy", proxy)
+        setattr_if_not_unset(cls, "cert", cert)
+        setattr_if_not_unset(cls, "timeout", timeout)
+        setattr_if_not_unset(cls, "retry_strategy", retry_strategy)
+        setattr_if_not_unset(cls, "request_log_config", request_log_config)
+        setattr_if_not_unset(cls, "response_log_config", response_log_config)
 
     @classmethod
     def open_global(cls) -> None:

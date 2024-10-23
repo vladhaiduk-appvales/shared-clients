@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from consts import UNSET, Unset
+from consts import UNSET, Unset, setattr_if_not_unset
 
 from .sync import HttpRequestLogConfig, HttpResponseLogConfig, SyncHttpClient
 
@@ -59,8 +59,7 @@ class SyncSupplierClient(SyncHttpClient):
         request_log_config: SupplierRequestLogConfig | None | Unset = UNSET,
         response_log_config: SupplierResponseLogConfig | Unset = UNSET,
     ) -> None:
-        if supplier_code is not UNSET:
-            self.supplier_code = supplier_code
+        setattr_if_not_unset(self, "supplier_code", supplier_code)
 
         super().__init__(
             base_url=base_url,
@@ -93,8 +92,7 @@ class SyncSupplierClient(SyncHttpClient):
         request_log_config: SupplierRequestLogConfig | None | Unset = UNSET,
         response_log_config: SupplierResponseLogConfig | Unset = UNSET,
     ) -> None:
-        if supplier_code is not UNSET:
-            cls.supplier_code = supplier_code
+        setattr_if_not_unset(cls, "supplier_code", supplier_code)
 
         return super().configure(
             base_url=base_url,
