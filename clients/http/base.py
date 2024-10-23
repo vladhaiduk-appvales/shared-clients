@@ -59,9 +59,7 @@ class BrokerHttpMessageBuilder(BrokerMessageBuilder):
         pass
 
     @abstractmethod
-    def build_body(
-        self, request: httpx.Request, response: httpx.Response, details: DetailsType | None = None
-    ) -> any | None:
+    def build_body(self, request: httpx.Request, response: httpx.Response, details: DetailsType | None = None) -> str:
         pass
 
 

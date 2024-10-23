@@ -7,7 +7,7 @@ from dataclasses import dataclass
 @dataclass
 class BrokerMessage:
     metadata: dict[str, any] | None
-    body: any | None
+    body: str
 
 
 class BrokerMessageBuilder(ABC):
@@ -21,7 +21,7 @@ class BrokerMessageBuilder(ABC):
         pass
 
     @abstractmethod
-    def build_body(self, *args: any, **kwargs: any) -> any | None:
+    def build_body(self, *args: any, **kwargs: any) -> str:
         pass
 
 
@@ -30,5 +30,5 @@ class BrokerClient(ABC):
         self.queue_url = queue_url
 
     @abstractmethod
-    def send_message(self, message: BrokerMessage) -> None:
+    def send_message(self, message: BrokerMessage) -> any:
         pass

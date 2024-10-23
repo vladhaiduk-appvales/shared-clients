@@ -27,44 +27,40 @@ class OptionalSingletonMeta(SingletonMeta):
         return super(SingletonMeta, cls).__call__(*args, **kwargs)
 
 
-# Just 3 examples of how to they work.
-class Dumb:
-    def __init__(self, name: str) -> None:
-        self.name = name
+if __name__ == "__main__":
 
+    class Dumb:
+        def __init__(self, name: str) -> None:
+            self.name = name
 
-dumb_1 = Dumb("first")
-dumb_2 = Dumb("second")
+    dumb_1 = Dumb("first")
+    dumb_2 = Dumb("second")
 
-print(dumb_1 is dumb_2)  # False
+    print(dumb_1 is dumb_2)  # False
 
+    class DumbSingleton(metaclass=SingletonMeta):
+        def __init__(self, name: str) -> None:
+            self.name = name
 
-class SingletonDumb(metaclass=SingletonMeta):
-    def __init__(self, name: str) -> None:
-        self.name = name
+    s_dumb_1 = DumbSingleton("first")
+    s_dumb_2 = DumbSingleton("second")
 
+    print(s_dumb_1 is s_dumb_2)  # True
 
-s_dumb_1 = SingletonDumb("first")
-s_dumb_2 = SingletonDumb("second")
+    class DumbOptionalSingleton(metaclass=OptionalSingletonMeta):
+        def __init__(self, name: str) -> None:
+            self.name = name
 
-print(s_dumb_1 is s_dumb_2)  # True
+    os_dumb_1 = DumbOptionalSingleton("first")
+    os_dumb_2 = DumbOptionalSingleton("second")
 
+    os_dumb_3 = DumbOptionalSingleton("third", singleton=True)
+    os_dumb_4 = DumbOptionalSingleton("fourth", singleton=True)
 
-class OptionalSingletonDumb(metaclass=OptionalSingletonMeta):
-    def __init__(self, name: str) -> None:
-        self.name = name
+    print(os_dumb_1 is os_dumb_2)  # False
+    print(os_dumb_3 is os_dumb_4)  # True
+    print(os_dumb_1.name, os_dumb_2.name, os_dumb_3.name, os_dumb_4.name)  # first second third third
 
+    os_dumb_5 = DumbOptionalSingleton("fifth")
 
-os_dumb_1 = OptionalSingletonDumb("first")
-os_dumb_2 = OptionalSingletonDumb("second")
-
-os_dumb_3 = OptionalSingletonDumb("third", singleton=True)
-os_dumb_4 = OptionalSingletonDumb("fourth", singleton=True)
-
-print(os_dumb_1 is os_dumb_2)  # False
-print(os_dumb_3 is os_dumb_4)  # True
-print(os_dumb_1.name, os_dumb_2.name, os_dumb_3.name, os_dumb_4.name)  # first second third third
-
-os_dumb_5 = OptionalSingletonDumb("fifth")
-
-print(os_dumb_5.name)
+    print(os_dumb_5.name)  # fifth
