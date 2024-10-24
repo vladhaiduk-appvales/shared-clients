@@ -10,6 +10,8 @@ from clients.broker import BrokerClient, BrokerMessageBuilder
 from consts import UNSET, Unset, setattr_if_not_unset
 from loggers import http_clients_logger
 
+from .response import EnhancedResponse
+
 if TYPE_CHECKING:
     from types import TracebackType
 
@@ -54,17 +56,17 @@ class HttpResponseLogConfig:
 
 
 class BrokerHttpMessageBuilder(BrokerMessageBuilder):
-    def filter(self, request: httpx.Request, response: httpx.Response, details: DetailsType) -> bool:
+    def filter(self, request: httpx.Request, response: EnhancedResponse, details: DetailsType) -> bool:
         return True
 
     @abstractmethod
     def build_metadata(
-        self, request: httpx.Request, response: httpx.Response, details: DetailsType
+        self, request: httpx.Request, response: EnhancedResponse, details: DetailsType
     ) -> dict[str, any] | None:
         pass
 
     @abstractmethod
-    def build_body(self, request: httpx.Request, response: httpx.Response, details: DetailsType) -> str:
+    def build_body(self, request: httpx.Request, response: EnhancedResponse, details: DetailsType) -> str:
         pass
 
 
@@ -238,7 +240,7 @@ class SyncHttpClient:
 
         return f"Sending HTTP request [{details['request_label']}]: {request.method} {request.url}", extra
 
-    def response_log(self, response: httpx.Response, details: DetailsType) -> tuple[str, dict[str, any]]:
+    def response_log(self, response: EnhancedResponse, details: DetailsType) -> tuple[str, dict[str, any]]:
         extra = {"request": {}, "response": {}}
 
         if self.response_log_config.request_name:
@@ -253,9 +255,9 @@ class SyncHttpClient:
         if self.response_log_config.response_status_code:
             extra["response"]["status_code"] = response.status_code
         if self.response_log_config.response_headers:
-            extra["response"]["headers"] = dict(response.headers)
+            extra["response"]["headers"] = response.headers
         if self.response_log_config.response_body:
-            extra["response"]["body"] = response.content.decode()
+            extra["response"]["body"] = response.text
         if self.response_log_config.response_elapsed_time:
             extra["response"]["elapsed_time"] = response.elapsed.total_seconds()
 
@@ -271,16 +273,17 @@ class SyncHttpClient:
 
     def _send_request(
         self, request: httpx.Request, *, auth: httpx.Auth | None = None, details: DetailsType
-    ) -> httpx.Response:
+    ) -> EnhancedResponse:
         request_log_message, request_log_extra = self.request_log(request, details)
         http_clients_logger.info(request_log_message, extra=request_log_extra)
 
         response = self._client.send(request, auth=auth)
+        enhanced_response = EnhancedResponse(response)
 
-        response_log_message, response_log_extra = self.response_log(response, details)
+        response_log_message, response_log_extra = self.response_log(enhanced_response, details)
         http_clients_logger.info(response_log_message, extra=response_log_extra)
 
-        return response
+        return enhanced_response
 
     def request(
         self,
@@ -297,7 +300,7 @@ class SyncHttpClient:
         timeout: TimeoutType | None | Unset = UNSET,
         retry_strategy: RetryStrategy | None | Unset = UNSET,
         details: DetailsType | None = None,
-    ) -> httpx.Response:
+    ) -> EnhancedResponse:
         details = details or {}
 
         if "request_name" not in details:
@@ -349,7 +352,7 @@ class SyncHttpClient:
         timeout: TimeoutType | None | Unset = UNSET,
         retry_strategy: RetryStrategy | None | Unset = UNSET,
         details: DetailsType | None = None,
-    ) -> httpx.Response:
+    ) -> EnhancedResponse:
         return self.request(
             "GET",
             url,
@@ -377,7 +380,7 @@ class SyncHttpClient:
         timeout: TimeoutType | None | Unset = UNSET,
         retry_strategy: RetryStrategy | None | Unset = UNSET,
         details: DetailsType | None = None,
-    ) -> httpx.Response:
+    ) -> EnhancedResponse:
         return self.request(
             "POST",
             url,
@@ -407,7 +410,7 @@ class SyncHttpClient:
         timeout: TimeoutType | None | Unset = UNSET,
         retry_strategy: RetryStrategy | None | Unset = UNSET,
         details: DetailsType | None = None,
-    ) -> httpx.Response:
+    ) -> EnhancedResponse:
         return self.request(
             "PUT",
             url,
@@ -437,7 +440,7 @@ class SyncHttpClient:
         timeout: TimeoutType | None | Unset = UNSET,
         retry_strategy: RetryStrategy | None | Unset = UNSET,
         details: DetailsType | None = None,
-    ) -> httpx.Response:
+    ) -> EnhancedResponse:
         return self.request(
             "PATCH",
             url,
@@ -465,7 +468,7 @@ class SyncHttpClient:
         timeout: TimeoutType | None | Unset = UNSET,
         retry_strategy: RetryStrategy | None | Unset = UNSET,
         details: DetailsType | None = None,
-    ) -> httpx.Response:
+    ) -> EnhancedResponse:
         return self.request(
             "DELETE",
             url,

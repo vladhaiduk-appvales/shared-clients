@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from clients.broker import BrokerClient
     from retry import RetryStrategy
 
+    from .response import EnhancedResponse
     from .types_ import (
         CertType,
         ContentBodyType,
@@ -56,14 +57,14 @@ class SQSSupplierMessageBuilder(BrokerHttpMessageBuilder, SQSMessageBuilder):
         self.allowed_request_names = allowed_request_names or set()
         self.disallowed_request_tags = disallowed_request_tags or set()
 
-    def filter(self, request: httpx.Request, response: httpx.Response, details: DetailsType) -> bool:
+    def filter(self, request: httpx.Request, response: EnhancedResponse, details: DetailsType) -> bool:
         return (
             details["request_name"] in self.allowed_request_names
             and details["request_tag"] not in self.disallowed_request_tags
         )
 
     def build_metadata(
-        self, request: httpx.Request, response: httpx.Response, details: DetailsType
+        self, request: httpx.Request, response: EnhancedResponse, details: DetailsType
     ) -> dict[str, any] | None:
         request_label = details["request_label"]
         supplier_label = details["supplier_label"]
@@ -91,7 +92,7 @@ class SQSSupplierMessageBuilder(BrokerHttpMessageBuilder, SQSMessageBuilder):
 
         return attributes
 
-    def build_body(self, request: httpx.Request, response: httpx.Response, details: DetailsType) -> str:
+    def build_body(self, request: httpx.Request, response: EnhancedResponse, details: DetailsType) -> str:
         request_text = request.content.decode()
         request_text = mask_card_number(mask_series_code(request_text))
 
@@ -211,7 +212,7 @@ class SyncSupplierClient(SyncHttpClient):
 
         return f"{header} to [{details['supplier_label']}] supplier:{body}", extra
 
-    def response_log(self, response: httpx.Response, details: DetailsType) -> tuple[str, dict[str, any]]:
+    def response_log(self, response: EnhancedResponse, details: DetailsType) -> tuple[str, dict[str, any]]:
         message, extra = super().response_log(response=response, details=details)
         header, body = message.split(":", maxsplit=1)
 
@@ -236,7 +237,7 @@ class SyncSupplierClient(SyncHttpClient):
         timeout: TimeoutType | None | Unset = UNSET,
         retry_strategy: RetryStrategy | None | Unset = UNSET,
         details: DetailsType | None = None,
-    ) -> httpx.Response:
+    ) -> EnhancedResponse:
         details = details or {}
         supplier_code = supplier_code if supplier_code is not UNSET else self.supplier_code
 
@@ -277,7 +278,7 @@ class SyncSupplierClient(SyncHttpClient):
         timeout: TimeoutType | None | Unset = UNSET,
         retry_strategy: RetryStrategy | None | Unset = UNSET,
         details: DetailsType | None = None,
-    ) -> httpx.Response:
+    ) -> EnhancedResponse:
         return self.request(
             "GET",
             url,
@@ -307,7 +308,7 @@ class SyncSupplierClient(SyncHttpClient):
         timeout: TimeoutType | None | Unset = UNSET,
         retry_strategy: RetryStrategy | None | Unset = UNSET,
         details: DetailsType | None = None,
-    ) -> httpx.Response:
+    ) -> EnhancedResponse:
         return self.request(
             "POST",
             url,
@@ -339,7 +340,7 @@ class SyncSupplierClient(SyncHttpClient):
         timeout: TimeoutType | None | Unset = UNSET,
         retry_strategy: RetryStrategy | None | Unset = UNSET,
         details: DetailsType | None = None,
-    ) -> httpx.Response:
+    ) -> EnhancedResponse:
         return self.request(
             "PUT",
             url,
@@ -371,7 +372,7 @@ class SyncSupplierClient(SyncHttpClient):
         timeout: TimeoutType | None | Unset = UNSET,
         retry_strategy: RetryStrategy | None | Unset = UNSET,
         details: DetailsType | None = None,
-    ) -> httpx.Response:
+    ) -> EnhancedResponse:
         return self.request(
             "PATCH",
             url,
@@ -401,7 +402,7 @@ class SyncSupplierClient(SyncHttpClient):
         timeout: TimeoutType | None | Unset = UNSET,
         retry_strategy: RetryStrategy | None | Unset = UNSET,
         details: DetailsType | None = None,
-    ) -> httpx.Response:
+    ) -> EnhancedResponse:
         return self.request(
             "DELETE",
             url,
