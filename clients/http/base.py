@@ -10,6 +10,7 @@ from clients.broker import BrokerClient, BrokerMessageBuilder
 from consts import UNSET, Unset, setattr_if_not_unset
 from loggers import http_clients_logger
 
+from .request import EnhancedRequest
 from .response import EnhancedResponse
 
 if TYPE_CHECKING:
@@ -56,17 +57,17 @@ class HttpResponseLogConfig:
 
 
 class BrokerHttpMessageBuilder(BrokerMessageBuilder):
-    def filter(self, request: httpx.Request, response: EnhancedResponse, details: DetailsType) -> bool:
+    def filter(self, request: EnhancedRequest, response: EnhancedResponse, details: DetailsType) -> bool:
         return True
 
     @abstractmethod
     def build_metadata(
-        self, request: httpx.Request, response: EnhancedResponse, details: DetailsType
+        self, request: EnhancedRequest, response: EnhancedResponse, details: DetailsType
     ) -> dict[str, any] | None:
         pass
 
     @abstractmethod
-    def build_body(self, request: httpx.Request, response: EnhancedResponse, details: DetailsType) -> str:
+    def build_body(self, request: EnhancedRequest, response: EnhancedResponse, details: DetailsType) -> str:
         pass
 
 
@@ -219,7 +220,7 @@ class SyncHttpClient:
         self._local_client.__exit__(exc_type, exc_value, traceback)
         self.close()
 
-    def request_log(self, request: httpx.Request, details: DetailsType) -> tuple[str, dict[str, any]]:
+    def request_log(self, request: EnhancedRequest, details: DetailsType) -> tuple[str, dict[str, any]]:
         extra = {"request": {}}
 
         if self.request_log_config.request_name:
@@ -231,9 +232,9 @@ class SyncHttpClient:
         if self.request_log_config.request_url:
             extra["request"]["url"] = request.url
         if self.request_log_config.request_headers:
-            extra["request"]["headers"] = dict(request.headers)
+            extra["request"]["headers"] = request.headers
         if self.request_log_config.request_body:
-            extra["request"]["body"] = request.content.decode()
+            extra["request"]["body"] = request.text
 
         if not extra["request"]:
             del extra["request"]
@@ -272,12 +273,12 @@ class SyncHttpClient:
         ), extra
 
     def _send_request(
-        self, request: httpx.Request, *, auth: httpx.Auth | None = None, details: DetailsType
+        self, request: EnhancedRequest, *, auth: httpx.Auth | None = None, details: DetailsType
     ) -> EnhancedResponse:
         request_log_message, request_log_extra = self.request_log(request, details)
         http_clients_logger.info(request_log_message, extra=request_log_extra)
 
-        response = self._client.send(request, auth=auth)
+        response = self._client.send(request.origin, auth=auth)
         enhanced_response = EnhancedResponse(response)
 
         response_log_message, response_log_extra = self.response_log(enhanced_response, details)
@@ -320,8 +321,10 @@ class SyncHttpClient:
             json=json,
             timeout=timeout if timeout is not UNSET else self.timeout,
         )
+        enhanced_request = EnhancedRequest(request)
+
         send_request_kwargs = {
-            "request": request,
+            "request": enhanced_request,
             "auth": auth if auth is not UNSET else self.auth,
             "details": details,
         }
@@ -334,7 +337,7 @@ class SyncHttpClient:
         )
 
         if self.broker_client and self.broker_message_builder:
-            message = self.broker_message_builder.build(response.request, response, details)
+            message = self.broker_message_builder.build(enhanced_request, response, details)
             if message:
                 self.broker_client.send_message(message=message)
 

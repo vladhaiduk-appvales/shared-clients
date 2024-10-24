@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from clients.broker import BrokerClient
     from retry import RetryStrategy
 
+    from .request import EnhancedRequest
     from .response import EnhancedResponse
     from .types_ import (
         CertType,
@@ -57,14 +58,14 @@ class SQSSupplierMessageBuilder(BrokerHttpMessageBuilder, SQSMessageBuilder):
         self.allowed_request_names = allowed_request_names or set()
         self.disallowed_request_tags = disallowed_request_tags or set()
 
-    def filter(self, request: httpx.Request, response: EnhancedResponse, details: DetailsType) -> bool:
+    def filter(self, request: EnhancedRequest, response: EnhancedResponse, details: DetailsType) -> bool:
         return (
             details["request_name"] in self.allowed_request_names
             and details["request_tag"] not in self.disallowed_request_tags
         )
 
     def build_metadata(
-        self, request: httpx.Request, response: EnhancedResponse, details: DetailsType
+        self, request: EnhancedRequest, response: EnhancedResponse, details: DetailsType
     ) -> dict[str, any] | None:
         request_label = details["request_label"]
         supplier_label = details["supplier_label"]
@@ -92,13 +93,10 @@ class SQSSupplierMessageBuilder(BrokerHttpMessageBuilder, SQSMessageBuilder):
 
         return attributes
 
-    def build_body(self, request: httpx.Request, response: EnhancedResponse, details: DetailsType) -> str:
-        request_text = request.content.decode()
-        request_text = mask_card_number(mask_series_code(request_text))
-
+    def build_body(self, request: EnhancedRequest, response: EnhancedResponse, details: DetailsType) -> str:
         return json.dumps(
             {
-                "request": compress_and_encode(request_text),
+                "request": compress_and_encode(mask_card_number(mask_series_code(request.text))),
                 "response": compress_and_encode(response.content),
             }
         )
@@ -203,8 +201,8 @@ class SyncSupplierClient(SyncHttpClient):
             broker_message_builder=broker_message_builder,
         )
 
-    def request_log(self, request: httpx.Request, details: DetailsType) -> tuple[str, dict[str, any]]:
-        message, extra = super().request_log(request=request, details=details)
+    def request_log(self, request: EnhancedRequest, details: DetailsType) -> tuple[str, dict[str, any]]:
+        message, extra = super().request_log(request, details)
         header, body = message.split(":", maxsplit=1)
 
         if self.request_log_config.supplier_code:
@@ -213,7 +211,7 @@ class SyncSupplierClient(SyncHttpClient):
         return f"{header} to [{details['supplier_label']}] supplier:{body}", extra
 
     def response_log(self, response: EnhancedResponse, details: DetailsType) -> tuple[str, dict[str, any]]:
-        message, extra = super().response_log(response=response, details=details)
+        message, extra = super().response_log(response, details)
         header, body = message.split(":", maxsplit=1)
 
         if self.request_log_config.supplier_code:

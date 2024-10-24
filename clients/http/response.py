@@ -2,6 +2,8 @@ import datetime as dt
 
 import httpx
 
+Response = httpx.Response
+
 
 class EnhancedResponse:
     """Enhanced HTTPX Response Wrapper.
@@ -11,8 +13,12 @@ class EnhancedResponse:
 
     """
 
-    def __init__(self, response: httpx.Response) -> None:
+    def __init__(self, response: Response) -> None:
         self._response = response
+
+    @property
+    def origin(self) -> Response:
+        return self._response
 
     @property
     def status_code(self) -> int:

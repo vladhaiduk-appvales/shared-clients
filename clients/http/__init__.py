@@ -1,5 +1,6 @@
-from httpx import Auth, BasicAuth, Request, Response
+from httpx import Auth, BasicAuth
 
 from .base import BrokerHttpMessageBuilder, HttpRequestLogConfig, HttpResponseLogConfig, SyncHttpClient
-from .response import EnhancedResponse
+from .request import EnhancedRequest, Request
+from .response import EnhancedResponse, Response
 from .supplier import SQSSupplierMessageBuilder, SupplierRequestLogConfig, SupplierResponseLogConfig, SyncSupplierClient
