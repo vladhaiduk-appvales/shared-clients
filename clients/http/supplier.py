@@ -47,23 +47,32 @@ class SupplierResponseLogConfig(HttpResponseLogConfig):
 class SQSSupplierMessageBuilder(BrokerHttpMessageBuilder, SQSMessageBuilder):
     """A specific implementation of the SQSMessageBuilder for the raw-supplier-message-storage service."""
 
-    def __init__(self, *, allowed_request_names: set[str] | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        allowed_request_names: set[str | None] | None = None,
+        disallowed_request_tags: set[str | None] | None = None,
+    ) -> None:
         self.allowed_request_names = allowed_request_names or set()
+        self.disallowed_request_tags = disallowed_request_tags or set()
 
     def filter(self, request: httpx.Request, response: httpx.Response, details: DetailsType) -> bool:
-        return details["request_name"] in self.allowed_request_names
+        return (
+            details["request_name"] in self.allowed_request_names
+            and details["request_tag"] not in self.disallowed_request_tags
+        )
 
     def build_metadata(
         self, request: httpx.Request, response: httpx.Response, details: DetailsType
     ) -> dict[str, any] | None:
-        request_name = details["request_name"]
-        supplier_code = details["supplier_code"]
+        request_label = details["request_label"]
+        supplier_label = details["supplier_label"]
         trace_id = details["trace_id"]
         timestamp = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
         attributes = {
-            "MessageType": self.string_attr(request_name),
-            "SupplierCode": self.string_attr(supplier_code),
+            "MessageType": self.string_attr(request_label),
+            "SupplierCode": self.string_attr(supplier_label),
             "TraceId": self.string_attr(trace_id),
             "TimeStamp": self.string_attr(timestamp),
         }
@@ -197,23 +206,19 @@ class SyncSupplierClient(SyncHttpClient):
         message, extra = super().request_log(request=request, details=details)
         header, body = message.split(":", maxsplit=1)
 
-        supplier_code = details["supplier_code"]
-
         if self.request_log_config.supplier_code:
-            extra["supplier_code"] = supplier_code
+            extra["supplier_code"] = details["supplier_code"]
 
-        return f"{header} to [{supplier_code}] supplier:{body}", extra
+        return f"{header} to [{details['supplier_label']}] supplier:{body}", extra
 
     def response_log(self, response: httpx.Response, details: DetailsType) -> tuple[str, dict[str, any]]:
         message, extra = super().response_log(response=response, details=details)
         header, body = message.split(":", maxsplit=1)
 
-        supplier_code = details["supplier_code"]
-
         if self.request_log_config.supplier_code:
-            extra["supplier_code"] = supplier_code
+            extra["supplier_code"] = details["supplier_code"]
 
-        return f"{header} from [{supplier_code}] supplier:{body}", extra
+        return f"{header} from [{details['supplier_label']}] supplier:{body}", extra
 
     def request(
         self,
@@ -221,6 +226,7 @@ class SyncSupplierClient(SyncHttpClient):
         url: UrlType,
         *,
         name: str | None = None,
+        tag: str | None = None,
         supplier_code: str | None | Unset = UNSET,
         params: ParamsType | None = None,
         headers: HeadersType | None = None,
@@ -232,9 +238,12 @@ class SyncSupplierClient(SyncHttpClient):
         details: DetailsType | None = None,
     ) -> httpx.Response:
         details = details or {}
+        supplier_code = supplier_code if supplier_code is not UNSET else self.supplier_code
 
         if "supplier_code" not in details:
-            details["supplier_code"] = supplier_code if supplier_code is not UNSET else self.supplier_code or "UNKNOWN"
+            details["supplier_code"] = supplier_code
+        if "supplier_label" not in details:
+            details["supplier_label"] = supplier_code or "UNKNOWN"
 
         if "trace_id" not in details:
             with tracer.trace("SupplierClient.request", service=self.service_name) as span:
@@ -244,6 +253,7 @@ class SyncSupplierClient(SyncHttpClient):
             method,
             url,
             name=name,
+            tag=tag,
             params=params,
             headers=headers,
             auth=auth,
@@ -259,6 +269,7 @@ class SyncSupplierClient(SyncHttpClient):
         url: UrlType,
         *,
         name: str | None = None,
+        tag: str | None = None,
         supplier_code: str | None | Unset = UNSET,
         params: ParamsType | None = None,
         headers: HeadersType | None = None,
@@ -271,6 +282,7 @@ class SyncSupplierClient(SyncHttpClient):
             "GET",
             url,
             name=name,
+            tag=tag,
             supplier_code=supplier_code,
             params=params,
             headers=headers,
@@ -285,6 +297,7 @@ class SyncSupplierClient(SyncHttpClient):
         url: UrlType,
         *,
         name: str | None = None,
+        tag: str | None = None,
         supplier_code: str | None | Unset = UNSET,
         params: ParamsType | None = None,
         headers: HeadersType | None = None,
@@ -299,6 +312,7 @@ class SyncSupplierClient(SyncHttpClient):
             "POST",
             url,
             name=name,
+            tag=tag,
             supplier_code=supplier_code,
             params=params,
             headers=headers,
@@ -315,6 +329,7 @@ class SyncSupplierClient(SyncHttpClient):
         url: UrlType,
         *,
         name: str | None = None,
+        tag: str | None = None,
         supplier_code: str | None | Unset = UNSET,
         params: ParamsType | None = None,
         headers: HeadersType | None = None,
@@ -329,6 +344,7 @@ class SyncSupplierClient(SyncHttpClient):
             "PUT",
             url,
             name=name,
+            tag=tag,
             supplier_code=supplier_code,
             params=params,
             headers=headers,
@@ -345,6 +361,7 @@ class SyncSupplierClient(SyncHttpClient):
         url: UrlType,
         *,
         name: str | None = None,
+        tag: str | None = None,
         supplier_code: str | None | Unset = UNSET,
         params: ParamsType | None = None,
         headers: HeadersType | None = None,
@@ -359,6 +376,7 @@ class SyncSupplierClient(SyncHttpClient):
             "PATCH",
             url,
             name=name,
+            tag=tag,
             supplier_code=supplier_code,
             params=params,
             headers=headers,
@@ -375,6 +393,7 @@ class SyncSupplierClient(SyncHttpClient):
         url: UrlType,
         *,
         name: str | None = None,
+        tag: str | None = None,
         supplier_code: str | None | Unset = UNSET,
         params: ParamsType | None = None,
         headers: HeadersType | None = None,
@@ -387,6 +406,7 @@ class SyncSupplierClient(SyncHttpClient):
             "DELETE",
             url,
             name=name,
+            tag=tag,
             supplier_code=supplier_code,
             params=params,
             headers=headers,

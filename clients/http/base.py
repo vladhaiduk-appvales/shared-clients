@@ -33,6 +33,7 @@ if TYPE_CHECKING:
 @dataclass
 class HttpRequestLogConfig:
     request_name: bool = True
+    request_tag: bool = True
     request_method: bool = True
     request_url: bool = True
     request_headers: bool = False
@@ -42,6 +43,7 @@ class HttpRequestLogConfig:
 @dataclass
 class HttpResponseLogConfig:
     request_name: bool = True
+    request_tag: bool = True
     request_method: bool = True
     request_url: bool = True
 
@@ -218,10 +220,10 @@ class SyncHttpClient:
     def request_log(self, request: httpx.Request, details: DetailsType) -> tuple[str, dict[str, any]]:
         extra = {"request": {}}
 
-        request_name = details["request_name"]
-
         if self.request_log_config.request_name:
-            extra["request"]["name"] = request_name
+            extra["request"]["name"] = details["request_name"]
+        if self.request_log_config.request_tag:
+            extra["request"]["tag"] = details["request_tag"]
         if self.request_log_config.request_method:
             extra["request"]["method"] = request.method
         if self.request_log_config.request_url:
@@ -234,15 +236,15 @@ class SyncHttpClient:
         if not extra["request"]:
             del extra["request"]
 
-        return f"Sending HTTP request [{request_name}]: {request.method} {request.url}", extra
+        return f"Sending HTTP request [{details['request_label']}]: {request.method} {request.url}", extra
 
     def response_log(self, response: httpx.Response, details: DetailsType) -> tuple[str, dict[str, any]]:
         extra = {"request": {}, "response": {}}
 
-        request_name = details["request_name"]
-
         if self.response_log_config.request_name:
-            extra["request"]["name"] = request_name
+            extra["request"]["name"] = details["request_name"]
+        if self.response_log_config.request_tag:
+            extra["request"]["tag"] = details["request_tag"]
         if self.response_log_config.request_method:
             extra["request"]["method"] = response.request.method
         if self.response_log_config.request_url:
@@ -263,38 +265,17 @@ class SyncHttpClient:
             del extra["response"]
 
         return (
-            f"HTTP response received [{request_name}]: "
+            f"HTTP response received [{details['request_label']}]: "
             f"{response.request.method} {response.request.url} -> {response.status_code}"
         ), extra
 
     def _send_request(
-        self,
-        method: MethodType,
-        url: UrlType,
-        *,
-        params: ParamsType | None = None,
-        headers: HeadersType | None = None,
-        auth: httpx.Auth | None | Unset = UNSET,
-        # Currently, cleint does not support form data and file uploads.
-        content: ContentBodyType | None = None,
-        json: JsonBodyType | None = None,
-        timeout: TimeoutType | None | Unset = UNSET,
-        details: DetailsType,
+        self, request: httpx.Request, *, auth: httpx.Auth | None = None, details: DetailsType
     ) -> httpx.Response:
-        request = self._client.build_request(
-            method,
-            url,
-            params=params,
-            headers=headers,
-            content=content,
-            json=json,
-            timeout=timeout if timeout is not UNSET else self.timeout,
-        )
-
         request_log_message, request_log_extra = self.request_log(request, details)
         http_clients_logger.info(request_log_message, extra=request_log_extra)
 
-        response = self._client.send(request, auth=auth if auth is not UNSET else self.auth)
+        response = self._client.send(request, auth=auth)
 
         response_log_message, response_log_extra = self.response_log(response, details)
         http_clients_logger.info(response_log_message, extra=response_log_extra)
@@ -307,6 +288,7 @@ class SyncHttpClient:
         url: UrlType,
         *,
         name: str | None = None,
+        tag: str | None = None,
         params: ParamsType | None = None,
         headers: HeadersType | None = None,
         auth: httpx.Auth | None | Unset = UNSET,
@@ -319,25 +301,33 @@ class SyncHttpClient:
         details = details or {}
 
         if "request_name" not in details:
-            details["request_name"] = name or "UNNAMED"
+            details["request_name"] = name
+        if "request_tag" not in details:
+            details["request_tag"] = tag
+        if "request_label" not in details:
+            prefix = name or "UNNAMED"
+            details["request_label"] = f"{prefix}-{tag}" if tag else prefix
 
-        request_kwargs = {
-            "method": method,
-            "url": url,
-            "params": params,
-            "headers": headers,
-            "auth": auth,
-            "content": content,
-            "json": json,
-            "timeout": timeout,
+        request = self._client.build_request(
+            method,
+            url,
+            params=params,
+            headers=headers,
+            content=content,
+            json=json,
+            timeout=timeout if timeout is not UNSET else self.timeout,
+        )
+        send_request_kwargs = {
+            "request": request,
+            "auth": auth if auth is not UNSET else self.auth,
             "details": details,
         }
 
         retry_strategy = retry_strategy if retry_strategy is not UNSET else self.retry_strategy
         response = (
-            retry_strategy.retry(self._send_request, **request_kwargs)
+            retry_strategy.retry(self._send_request, **send_request_kwargs)
             if retry_strategy
-            else self._send_request(**request_kwargs)
+            else self._send_request(**send_request_kwargs)
         )
 
         if self.broker_client and self.broker_message_builder:
@@ -352,6 +342,7 @@ class SyncHttpClient:
         url: UrlType,
         *,
         name: str | None = None,
+        tag: str | None = None,
         params: ParamsType | None = None,
         headers: HeadersType | None = None,
         auth: httpx.Auth | None | Unset = UNSET,
@@ -363,6 +354,7 @@ class SyncHttpClient:
             "GET",
             url,
             name=name,
+            tag=tag,
             params=params,
             headers=headers,
             auth=auth,
@@ -376,6 +368,7 @@ class SyncHttpClient:
         url: UrlType,
         *,
         name: str | None = None,
+        tag: str | None = None,
         params: ParamsType | None = None,
         headers: HeadersType | None = None,
         auth: httpx.Auth | None | Unset = UNSET,
@@ -389,6 +382,7 @@ class SyncHttpClient:
             "POST",
             url,
             name=name,
+            tag=tag,
             params=params,
             headers=headers,
             auth=auth,
@@ -404,6 +398,7 @@ class SyncHttpClient:
         url: UrlType,
         *,
         name: str | None = None,
+        tag: str | None = None,
         params: ParamsType | None = None,
         headers: HeadersType | None = None,
         auth: httpx.Auth | None | Unset = UNSET,
@@ -417,6 +412,7 @@ class SyncHttpClient:
             "PUT",
             url,
             name=name,
+            tag=tag,
             params=params,
             headers=headers,
             auth=auth,
@@ -432,6 +428,7 @@ class SyncHttpClient:
         url: UrlType,
         *,
         name: str | None = None,
+        tag: str | None = None,
         params: ParamsType | None = None,
         headers: HeadersType | None = None,
         auth: httpx.Auth | None | Unset = UNSET,
@@ -445,6 +442,7 @@ class SyncHttpClient:
             "PATCH",
             url,
             name=name,
+            tag=tag,
             params=params,
             headers=headers,
             auth=auth,
@@ -460,6 +458,7 @@ class SyncHttpClient:
         url: UrlType,
         *,
         name: str | None = None,
+        tag: str | None = None,
         params: ParamsType | None = None,
         headers: HeadersType | None = None,
         auth: httpx.Auth | None | Unset = UNSET,
@@ -471,6 +470,7 @@ class SyncHttpClient:
             "DELETE",
             url,
             name=name,
+            tag=tag,
             params=params,
             headers=headers,
             auth=auth,

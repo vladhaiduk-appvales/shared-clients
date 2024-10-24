@@ -78,7 +78,10 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
             log_body=True,
             singleton=True,
         ),
-        broker_message_builder=SQSSupplierMessageBuilder(allowed_request_names={"LOCAL"}),
+        broker_message_builder=SQSSupplierMessageBuilder(
+            allowed_request_names={"LOCAL"},
+            disallowed_request_tags={None},
+        ),
     )
     SyncSupplierClient.open_global()
 
