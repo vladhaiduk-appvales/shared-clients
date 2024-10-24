@@ -5,6 +5,8 @@ import json
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from ddtrace import tracer
+
 from clients.broker import SQSMessageBuilder
 from consts import UNSET, Unset, setattr_if_not_unset
 from utils.text import compress_and_encode, mask_card_number, mask_series_code
@@ -56,8 +58,7 @@ class SQSSupplierMessageBuilder(BrokerHttpMessageBuilder, SQSMessageBuilder):
     ) -> dict[str, any] | None:
         request_name = details["request_name"]
         supplier_code = details["supplier_code"]
-        # TODO: I need to inject the trace_id into the details.
-        trace_id = details.get("trace_id")
+        trace_id = details["trace_id"]
         timestamp = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
         attributes = {
@@ -94,6 +95,7 @@ class SQSSupplierMessageBuilder(BrokerHttpMessageBuilder, SQSMessageBuilder):
 
 
 class SyncSupplierClient(SyncHttpClient):
+    service_name: str | None = None
     supplier_code: str | None = None
 
     # We redefine all class-level attributes to stop them from taking values from the parent class.
@@ -117,6 +119,7 @@ class SyncSupplierClient(SyncHttpClient):
     def __init__(
         self,
         *,
+        service_name: str | None | Unset = UNSET,
         supplier_code: str | None | Unset = UNSET,
         base_url: UrlType | None | Unset = UNSET,
         base_params: ParamsType | None | Unset = UNSET,
@@ -132,6 +135,7 @@ class SyncSupplierClient(SyncHttpClient):
         broker_client: BrokerClient | None | Unset = UNSET,
         broker_message_builder: BrokerHttpMessageBuilder | None | Unset = UNSET,
     ) -> None:
+        setattr_if_not_unset(self, "service_name", service_name)
         setattr_if_not_unset(self, "supplier_code", supplier_code)
 
         super().__init__(
@@ -154,6 +158,7 @@ class SyncSupplierClient(SyncHttpClient):
     def configure(
         cls,
         *,
+        service_name: str | None | Unset = UNSET,
         supplier_code: str | None | Unset = UNSET,
         base_url: UrlType | None | Unset = UNSET,
         base_params: ParamsType | None | Unset = UNSET,
@@ -169,6 +174,7 @@ class SyncSupplierClient(SyncHttpClient):
         broker_client: BrokerClient | None | Unset = UNSET,
         broker_message_builder: BrokerHttpMessageBuilder | None | Unset = UNSET,
     ) -> None:
+        setattr_if_not_unset(cls, "service_name", service_name)
         setattr_if_not_unset(cls, "supplier_code", supplier_code)
 
         return super().configure(
@@ -229,6 +235,10 @@ class SyncSupplierClient(SyncHttpClient):
 
         if "supplier_code" not in details:
             details["supplier_code"] = supplier_code if supplier_code is not UNSET else self.supplier_code or "UNKNOWN"
+
+        if "trace_id" not in details:
+            with tracer.trace("SupplierClient.request", service=self.service_name) as span:
+                details["trace_id"] = span.trace_id
 
         return super().request(
             method,
