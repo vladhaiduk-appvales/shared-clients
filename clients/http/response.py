@@ -1,6 +1,7 @@
 import datetime as dt
 
 import httpx
+import xmltodict
 
 Response = httpx.Response
 
@@ -51,5 +52,37 @@ class EnhancedResponse:
     def json(self, **kwargs: any) -> any:
         return self._response.json(**kwargs)
 
+    def xml(self, **kwargs: any) -> dict[str, any]:
+        return dict(xmltodict.parse(self.content, **kwargs))
+
     def raise_for_status(self) -> None:
         self._response.raise_for_status()
+
+
+if __name__ == "__main__":
+    xml_content = b"""
+    <audience>
+        <id what="attribute">456</id>
+        <name>John Doe</name>
+        <email>johndoe@example.com</email>
+        <phone>+1234567890</phone>
+        <addresses>
+            <address>
+                <street>123 Elm Street</street>
+                <city>Springfield</city>
+                <state>IL</state>
+                <zip>62701</zip>
+            </address>
+            <address>
+                <street>456 Oak Avenue</street>
+                <city>Metropolis</city>
+                <state>NY</state>
+                <zip>10001</zip>
+            </address>
+        </addresses>
+    </audience>
+    """
+    response = Response(200, content=xml_content, headers={"Content-Type": "application/xml"})
+    enhanced_response = EnhancedResponse(response)
+
+    print(enhanced_response.xml())
