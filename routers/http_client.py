@@ -1,6 +1,8 @@
+import asyncio
+
 from fastapi import APIRouter
 
-from clients.http import HttpRetryStrategy, SyncHttpClient
+from clients.http import AsyncHttpClient, HttpRetryStrategy, SyncHttpClient
 from retry import RetryStrategy
 
 router = APIRouter(prefix="/http")
@@ -26,6 +28,21 @@ async def local_usecase() -> dict:
     client.close()
 
     return response.json()
+
+
+@router.get("/local/async")
+async def local_async_usecase() -> list[dict]:
+    client = AsyncHttpClient()
+
+    # In case you forgot to open the client, it will be opened automatically.
+    responses = await asyncio.gather(
+        client.get("https://httpbin.org/get"),
+        client.get("https://httpbin.org/get"),
+        client.get("https://httpbin.org/get"),
+    )
+    await client.close()
+
+    return [response.json() for response in responses]
 
 
 @router.get("/local/context-manager")

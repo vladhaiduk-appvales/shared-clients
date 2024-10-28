@@ -9,7 +9,7 @@ import httpx
 from clients.broker import BrokerClient, BrokerMessageBuilder
 from consts import UNSET, Unset, setattr_if_not_unset
 from loggers import http_clients_logger
-from retry import RetryCallState, RetryStrategy, retry_on_exception, retry_on_result
+from retry import AsyncRetryStrategy, RetryState, RetryStrategy, retry_on_exception, retry_on_result
 
 from .request import EnhancedRequest
 from .response import EnhancedResponse
@@ -32,6 +32,7 @@ if TYPE_CHECKING:
     )
 
 
+# TODO: Make an async version of it.
 class HttpRetryStrategy(RetryStrategy):
     def __init__(
         self,
@@ -66,7 +67,7 @@ class HttpRetryStrategy(RetryStrategy):
 
         return False
 
-    def before(self, retry_state: RetryCallState) -> None:
+    def before(self, retry_state: RetryState) -> None:
         request = retry_state.kwargs.get("request") or retry_state.args[0]
         details = retry_state.kwargs["details"]
 
@@ -75,7 +76,7 @@ class HttpRetryStrategy(RetryStrategy):
             f"{request.method} {request.url}"
         )
 
-    def error_callback(self, retry_state: RetryCallState) -> None:
+    def error_callback(self, retry_state: RetryState) -> None:
         request = retry_state.kwargs.get("request") or retry_state.args[0]
         details = retry_state.kwargs["details"]
 
@@ -133,7 +134,7 @@ class SyncHttpClient:
     HTTPX with another library. Instead, it simply extends the HTTPX Client with the features we need.
     """
 
-    base_url: UrlType | None = None
+    base_url: UrlType = ""
     base_params: ParamsType | None = None
     base_headers: ParamsType | None = None
     cookies: CookiesType | None = None
@@ -153,7 +154,7 @@ class SyncHttpClient:
     def __init__(
         self,
         *,
-        base_url: UrlType | None | Unset = UNSET,
+        base_url: UrlType | Unset = UNSET,
         base_params: ParamsType | None | Unset = UNSET,
         base_headers: HeadersType | None | Unset = UNSET,
         cookies: CookiesType | None | Unset = UNSET,
@@ -189,7 +190,7 @@ class SyncHttpClient:
     def configure(
         cls,
         *,
-        base_url: UrlType | None | Unset = UNSET,
+        base_url: UrlType | Unset = UNSET,
         base_params: ParamsType | None | Unset = UNSET,
         base_headers: HeadersType | None | Unset = UNSET,
         cookies: CookiesType | None | Unset = UNSET,
@@ -528,6 +529,425 @@ class SyncHttpClient:
         details: DetailsType | None = None,
     ) -> EnhancedResponse:
         return self.request(
+            "DELETE",
+            url,
+            name=name,
+            tag=tag,
+            params=params,
+            headers=headers,
+            auth=auth,
+            timeout=timeout,
+            retry_strategy=retry_strategy,
+            details=details,
+        )
+
+
+class AsyncHttpClient:
+    """A wrapper around the HTTPX AsyncClient, designed to streamline and extend its functionality to meet our needs.
+
+    This client provides an intuitive and extended interface for executing asynchronous HTTP requests while maintaining
+    the core capabilities of the HTTPX AsyncClient. It is not a complete wrapper around HTTPX that would allow for
+    replacing HTTPX with another library. Instead, it simply extends the HTTPX AsyncClient with the features we need.
+    """
+
+    base_url: UrlType = ""
+    base_params: ParamsType | None = None
+    base_headers: ParamsType | None = None
+    cookies: CookiesType | None = None
+    auth: httpx.Auth | None = None
+    proxy: ProxyType | None = None
+    cert: CertType | None = None
+    timeout: TimeoutType | None = 5.0
+
+    retry_strategy: AsyncRetryStrategy | None = None
+    request_log_config: HttpRequestLogConfig = HttpRequestLogConfig()
+    response_log_config: HttpResponseLogConfig = HttpResponseLogConfig()
+    broker_client: BrokerClient | None = None
+    broker_message_builder: BrokerHttpMessageBuilder | None = None
+
+    _global_client: httpx.AsyncClient | None = None
+
+    def __init__(
+        self,
+        *,
+        base_url: UrlType | Unset = UNSET,
+        base_params: ParamsType | None | Unset = UNSET,
+        base_headers: HeadersType | None | Unset = UNSET,
+        cookies: CookiesType | None | Unset = UNSET,
+        auth: httpx.Auth | None | Unset = UNSET,
+        proxy: ProxyType | None | Unset = UNSET,
+        cert: CertType | None | Unset = UNSET,
+        timeout: TimeoutType | None | Unset = UNSET,
+        retry_strategy: AsyncRetryStrategy | None | Unset = UNSET,
+        request_log_config: HttpRequestLogConfig | None | Unset = UNSET,
+        response_log_config: HttpResponseLogConfig | Unset = UNSET,
+        broker_client: BrokerClient | None | Unset = UNSET,
+        broker_message_builder: BrokerHttpMessageBuilder | None | Unset = UNSET,
+    ) -> None:
+        # Instance-level attributes do not delete class-level attributes; they simply shadow them.
+        setattr_if_not_unset(self, "base_url", base_url)
+        setattr_if_not_unset(self, "base_params", base_params)
+        setattr_if_not_unset(self, "base_headers", base_headers)
+        setattr_if_not_unset(self, "cookies", cookies)
+        setattr_if_not_unset(self, "auth", auth)
+        setattr_if_not_unset(self, "proxy", proxy)
+        setattr_if_not_unset(self, "cert", cert)
+        setattr_if_not_unset(self, "timeout", timeout)
+
+        setattr_if_not_unset(self, "retry_strategy", retry_strategy)
+        setattr_if_not_unset(self, "request_log_config", request_log_config)
+        setattr_if_not_unset(self, "response_log_config", response_log_config)
+        setattr_if_not_unset(self, "broker_client", broker_client)
+        setattr_if_not_unset(self, "broker_message_builder", broker_message_builder)
+
+        self._local_client: httpx.AsyncClient | None = None
+
+    @classmethod
+    def configure(
+        cls,
+        *,
+        base_url: UrlType | Unset = UNSET,
+        base_params: ParamsType | None | Unset = UNSET,
+        base_headers: HeadersType | None | Unset = UNSET,
+        cookies: CookiesType | None | Unset = UNSET,
+        auth: httpx.Auth | None | Unset = UNSET,
+        proxy: ProxyType | None | Unset = UNSET,
+        cert: CertType | None | Unset = UNSET,
+        timeout: TimeoutType | None | Unset = UNSET,
+        retry_strategy: AsyncRetryStrategy | None | Unset = UNSET,
+        request_log_config: HttpRequestLogConfig | None | Unset = UNSET,
+        response_log_config: HttpResponseLogConfig | Unset = UNSET,
+        broker_client: BrokerClient | None | Unset = UNSET,
+        broker_message_builder: BrokerHttpMessageBuilder | None | Unset = UNSET,
+    ) -> SyncHttpClient:
+        setattr_if_not_unset(cls, "base_url", base_url)
+        setattr_if_not_unset(cls, "base_params", base_params)
+        setattr_if_not_unset(cls, "base_headers", base_headers)
+        setattr_if_not_unset(cls, "cookies", cookies)
+        setattr_if_not_unset(cls, "auth", auth)
+        setattr_if_not_unset(cls, "proxy", proxy)
+        setattr_if_not_unset(cls, "cert", cert)
+        setattr_if_not_unset(cls, "timeout", timeout)
+
+        setattr_if_not_unset(cls, "retry_strategy", retry_strategy)
+        setattr_if_not_unset(cls, "request_log_config", request_log_config)
+        setattr_if_not_unset(cls, "response_log_config", response_log_config)
+        setattr_if_not_unset(cls, "broker_client", broker_client)
+        setattr_if_not_unset(cls, "broker_message_builder", broker_message_builder)
+
+    @classmethod
+    def open_global(cls) -> None:
+        if not cls._global_client:
+            cls._global_client = httpx.AsyncClient(
+                base_url=cls.base_url,
+                params=cls.base_params,
+                headers=cls.base_headers,
+                cookies=cls.cookies,
+                auth=cls.auth,
+                proxy=cls.proxy,
+                cert=cls.cert,
+                timeout=cls.timeout,
+            )
+
+    @classmethod
+    async def close_global(cls) -> None:
+        if cls._global_client:
+            await cls._global_client.aclose()
+
+    def open(self) -> None:
+        if not self._local_client:
+            self._local_client = httpx.AsyncClient(
+                base_url=self.base_url,
+                params=self.base_params,
+                headers=self.base_headers,
+                cookies=self.cookies,
+                auth=self.auth,
+                proxy=self.proxy,
+                cert=self.cert,
+                timeout=self.timeout,
+            )
+
+    async def close(self) -> None:
+        if self._local_client:
+            await self._local_client.aclose()
+
+    @property
+    def _client(self) -> httpx.AsyncClient:
+        if not self._local_client and not self._global_client:
+            self.open()
+        return self._local_client or self._global_client
+
+    async def __aenter__(self) -> httpx.AsyncClient:
+        self.open()
+        await self._local_client.__aenter__()
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None = None,
+        exc_value: BaseException | None = None,
+        traceback: TracebackType | None = None,
+    ) -> None:
+        await self._local_client.__aexit__(exc_type, exc_value, traceback)
+        await self.close()
+
+    def request_log(self, request: EnhancedRequest, details: DetailsType) -> tuple[str, dict[str, any]]:
+        extra = {"request": {}}
+
+        if self.request_log_config.request_name:
+            extra["request"]["name"] = details["request_name"]
+        if self.request_log_config.request_tag:
+            extra["request"]["tag"] = details["request_tag"]
+        if self.request_log_config.request_method:
+            extra["request"]["method"] = request.method
+        if self.request_log_config.request_url:
+            extra["request"]["url"] = request.url
+        if self.request_log_config.request_headers:
+            extra["request"]["headers"] = request.headers
+        if self.request_log_config.request_body:
+            extra["request"]["body"] = request.text
+
+        if not extra["request"]:
+            del extra["request"]
+
+        return f"Sending HTTP request [{details['request_label']}]: {request.method} {request.url}", extra
+
+    def response_log(self, response: EnhancedResponse, details: DetailsType) -> tuple[str, dict[str, any]]:
+        extra = {"request": {}, "response": {}}
+
+        if self.response_log_config.request_name:
+            extra["request"]["name"] = details["request_name"]
+        if self.response_log_config.request_tag:
+            extra["request"]["tag"] = details["request_tag"]
+        if self.response_log_config.request_method:
+            extra["request"]["method"] = response.request.method
+        if self.response_log_config.request_url:
+            extra["request"]["url"] = response.request.url
+
+        if self.response_log_config.response_status_code:
+            extra["response"]["status_code"] = response.status_code
+        if self.response_log_config.response_headers:
+            extra["response"]["headers"] = response.headers
+        if self.response_log_config.response_body:
+            extra["response"]["body"] = response.text
+        if self.response_log_config.response_elapsed_time:
+            extra["response"]["elapsed_time"] = response.elapsed.total_seconds()
+
+        if not extra["request"]:
+            del extra["request"]
+        if not extra["response"]:
+            del extra["response"]
+
+        return (
+            f"HTTP response received [{details['request_label']}]: "
+            f"{response.request.method} {response.request.url} -> {response.status_code}"
+        ), extra
+
+    async def _send_request(
+        self, request: EnhancedRequest, *, auth: httpx.Auth | None = None, details: DetailsType
+    ) -> EnhancedResponse:
+        request_log_message, request_log_extra = self.request_log(request, details)
+        http_clients_logger.info(request_log_message, extra=request_log_extra)
+
+        response = await self._client.send(request.origin, auth=auth)
+        enhanced_response = EnhancedResponse(response)
+
+        response_log_message, response_log_extra = self.response_log(enhanced_response, details)
+        http_clients_logger.info(response_log_message, extra=response_log_extra)
+
+        return enhanced_response
+
+    async def request(
+        self,
+        method: MethodType,
+        url: UrlType,
+        *,
+        name: str | None = None,
+        tag: str | None = None,
+        params: ParamsType | None = None,
+        headers: HeadersType | None = None,
+        auth: httpx.Auth | None | Unset = UNSET,
+        content: ContentBodyType | None = None,
+        json: JsonBodyType | None = None,
+        timeout: TimeoutType | None | Unset = UNSET,
+        retry_strategy: AsyncRetryStrategy | None | Unset = UNSET,
+        details: DetailsType | None = None,
+    ) -> EnhancedResponse:
+        details = details or {}
+
+        if "request_name" not in details:
+            details["request_name"] = name
+        if "request_tag" not in details:
+            details["request_tag"] = tag
+        if "request_label" not in details:
+            prefix = name or "UNNAMED"
+            details["request_label"] = f"{prefix}-{tag}" if tag else prefix
+
+        request = self._client.build_request(
+            method,
+            url,
+            params=params,
+            headers=headers,
+            content=content,
+            json=json,
+            timeout=timeout if timeout is not UNSET else self.timeout,
+        )
+        enhanced_request = EnhancedRequest(request)
+
+        send_request_kwargs = {
+            "request": enhanced_request,
+            "auth": auth if auth is not UNSET else self.auth,
+            "details": details,
+        }
+
+        print("djhddh")
+
+        retry_strategy = retry_strategy if retry_strategy is not UNSET else self.retry_strategy
+        response = await (
+            retry_strategy.retry(self._send_request, **send_request_kwargs)
+            if retry_strategy
+            else self._send_request(**send_request_kwargs)
+        )
+
+        if self.broker_client and self.broker_message_builder:
+            message = self.broker_message_builder.build(enhanced_request, response, details)
+            if message:
+                http_clients_logger.info(f"Sending HTTP request [{details['request_label']}] message to broker")
+                # TODO: and we of course need to await in here :D
+                self.broker_client.send_message(message=message)
+
+        return response
+
+    async def get(
+        self,
+        url: UrlType,
+        *,
+        name: str | None = None,
+        tag: str | None = None,
+        params: ParamsType | None = None,
+        headers: HeadersType | None = None,
+        auth: httpx.Auth | None | Unset = UNSET,
+        timeout: TimeoutType | None | Unset = UNSET,
+        retry_strategy: AsyncRetryStrategy | None | Unset = UNSET,
+        details: DetailsType | None = None,
+    ) -> EnhancedResponse:
+        return await self.request(
+            "GET",
+            url,
+            name=name,
+            tag=tag,
+            params=params,
+            headers=headers,
+            auth=auth,
+            timeout=timeout,
+            retry_strategy=retry_strategy,
+            details=details,
+        )
+
+    async def post(
+        self,
+        url: UrlType,
+        *,
+        name: str | None = None,
+        tag: str | None = None,
+        params: ParamsType | None = None,
+        headers: HeadersType | None = None,
+        auth: httpx.Auth | None | Unset = UNSET,
+        content: ContentBodyType | None = None,
+        json: JsonBodyType | None = None,
+        timeout: TimeoutType | None | Unset = UNSET,
+        retry_strategy: AsyncRetryStrategy | None | Unset = UNSET,
+        details: DetailsType | None = None,
+    ) -> EnhancedResponse:
+        return await self.request(
+            "POST",
+            url,
+            name=name,
+            tag=tag,
+            params=params,
+            headers=headers,
+            auth=auth,
+            content=content,
+            json=json,
+            timeout=timeout,
+            retry_strategy=retry_strategy,
+            details=details,
+        )
+
+    async def put(
+        self,
+        url: UrlType,
+        *,
+        name: str | None = None,
+        tag: str | None = None,
+        params: ParamsType | None = None,
+        headers: HeadersType | None = None,
+        auth: httpx.Auth | None | Unset = UNSET,
+        content: ContentBodyType | None = None,
+        json: JsonBodyType | None = None,
+        timeout: TimeoutType | None | Unset = UNSET,
+        retry_strategy: AsyncRetryStrategy | None | Unset = UNSET,
+        details: DetailsType | None = None,
+    ) -> EnhancedResponse:
+        return await self.request(
+            "PUT",
+            url,
+            name=name,
+            tag=tag,
+            params=params,
+            headers=headers,
+            auth=auth,
+            content=content,
+            json=json,
+            timeout=timeout,
+            retry_strategy=retry_strategy,
+            details=details,
+        )
+
+    async def patch(
+        self,
+        url: UrlType,
+        *,
+        name: str | None = None,
+        tag: str | None = None,
+        params: ParamsType | None = None,
+        headers: HeadersType | None = None,
+        auth: httpx.Auth | None | Unset = UNSET,
+        content: ContentBodyType | None = None,
+        json: JsonBodyType | None = None,
+        timeout: TimeoutType | None | Unset = UNSET,
+        retry_strategy: AsyncRetryStrategy | None | Unset = UNSET,
+        details: DetailsType | None = None,
+    ) -> EnhancedResponse:
+        return await self.request(
+            "PATCH",
+            url,
+            name=name,
+            tag=tag,
+            params=params,
+            headers=headers,
+            auth=auth,
+            content=content,
+            json=json,
+            timeout=timeout,
+            retry_strategy=retry_strategy,
+            details=details,
+        )
+
+    async def delete(
+        self,
+        url: UrlType,
+        *,
+        name: str | None = None,
+        tag: str | None = None,
+        params: ParamsType | None = None,
+        headers: HeadersType | None = None,
+        auth: httpx.Auth | None | Unset = UNSET,
+        timeout: TimeoutType | None | Unset = UNSET,
+        retry_strategy: AsyncRetryStrategy | None | Unset = UNSET,
+        details: DetailsType | None = None,
+    ) -> EnhancedResponse:
+        return await self.request(
             "DELETE",
             url,
             name=name,

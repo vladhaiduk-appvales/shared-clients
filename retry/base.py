@@ -4,7 +4,7 @@ from functools import cached_property, partial, wraps
 from typing import Callable, TypeVar
 
 from tenacity import (
-    RetryCallState,
+    AsyncRetrying,
     RetryError,
     Retrying,
     after_nothing,
@@ -18,6 +18,7 @@ from tenacity import (
     stop_after_attempt,
     wait_fixed,
 )
+from tenacity import RetryCallState as RetryState
 
 RETRY_ATTR = "__retry__"
 RETRY_ON_EXCEPTION_ATTR = "__retry_on_exception__"
@@ -28,7 +29,7 @@ RETRY_ON_EXCEPTION_METHODS_ATTR = "__retry_on_exception_methods__"
 RETRY_ON_RESULT_METHODS_ATTR = "__retry_on_result_methods__"
 
 
-def retry(fn: Callable[[RetryCallState], bool]) -> Callable[[RetryCallState], bool]:
+def retry(fn: Callable[[RetryState], bool]) -> Callable[[RetryState], bool]:
     """Decorate a method to check for retry based on retry state.
 
     Methods decorated with this decorator will always execute.
@@ -132,16 +133,13 @@ class RetryStrategyMeta(type):
         return super().__new__(cls, name, bases, namespace)
 
 
-WrappedFnR = TypeVar("WrappedFnR")
-
-
-class RetryStrategy(metaclass=RetryStrategyMeta):
+class BaseRetryStrategy(metaclass=RetryStrategyMeta):
     def __init__(self, *, attempts: int = 0, delay: int = 0) -> None:
         self.attempts = attempts
         self.delay = delay
 
-    @cached_property
-    def _retry_base(self) -> retry_base:
+    @property
+    def _retry(self) -> retry_base:
         retry_methods = getattr(self, RETRY_METHODS_ATTR, {})
         retry_on_exception_methods = getattr(self, RETRY_ON_EXCEPTION_METHODS_ATTR, {})
         retry_on_result_methods = getattr(self, RETRY_ON_RESULT_METHODS_ATTR, {})
@@ -159,21 +157,18 @@ class RetryStrategy(metaclass=RetryStrategyMeta):
         return retry
 
     @property
-    def retrying(self) -> Retrying:
-        return Retrying(
-            stop=stop_after_attempt(self.attempts),
-            wait=wait_fixed(self.delay),
+    def _retrying_kwargs(self) -> dict[str, any]:
+        return {
+            "stop": stop_after_attempt(self.attempts),
+            "wait": wait_fixed(self.delay),
             # By default, it retries on any exception.
-            retry=retry_if_exception_type() if self._retry_base is retry_never else self._retry_base,
-            before=getattr(self, "before", before_nothing),
-            after=getattr(self, "after", after_nothing),
-            retry_error_callback=getattr(self, "error_callback", None),
-        )
+            "retry": retry_if_exception_type() if self._retry is retry_never else self._retry,
+            "before": getattr(self, "before", before_nothing),
+            "after": getattr(self, "after", after_nothing),
+            "retry_error_callback": getattr(self, "error_callback", None),
+        }
 
-    def retry(self, fn: Callable[..., WrappedFnR], *args: any, **kwargs: any) -> WrappedFnR:
-        return self.retrying(fn, *args, **kwargs)
-
-    def raise_retry_error(self, retry_state: RetryCallState) -> None:
+    def raise_retry_error(self, retry_state: RetryState) -> None:
         """Raise a RetryError based on the given retry state.
 
         This method is particularly useful for reraising errors within the `error_callback` method.
@@ -185,11 +180,32 @@ class RetryStrategy(metaclass=RetryStrategyMeta):
         raise error from retry_state.outcome.exception()
 
 
+WrappedFnR = TypeVar("WrappedFnR")
+
+
+class RetryStrategy(BaseRetryStrategy):
+    @cached_property
+    def retrying(self) -> Retrying:
+        return Retrying(**self._retrying_kwargs)
+
+    def retry(self, fn: Callable[..., WrappedFnR], *args: any, **kwargs: any) -> WrappedFnR:
+        return self.retrying(fn, *args, **kwargs)
+
+
+class AsyncRetryStrategy(BaseRetryStrategy):
+    @cached_property
+    def retrying(self) -> AsyncRetrying:
+        return AsyncRetrying(**self._retrying_kwargs)
+
+    async def retry(self, fn: Callable[..., WrappedFnR], *args: any, **kwargs: any) -> WrappedFnR:
+        return await self.retrying(fn, *args, **kwargs)
+
+
 if __name__ == "__main__":
 
     class CustomRetryStrategy(RetryStrategy):
         @retry
-        def retry_on_xxx(self, retry_state: RetryCallState) -> bool:
+        def retry_on_xxx(self, retry_state: RetryState) -> bool:
             print("retry_on_xxx")
             return False
 
@@ -204,17 +220,17 @@ if __name__ == "__main__":
             return isinstance(result, int)
 
         @retry
-        def retry_on_yyy(self, retry_state: RetryCallState) -> bool:
+        def retry_on_yyy(self, retry_state: RetryState) -> bool:
             print("retry_on_yyy")
             return False
 
-        def before(self, retry_state: RetryCallState) -> None:
+        def before(self, retry_state: RetryState) -> None:
             print(self, "before")
 
-        def after(self, retry_state: RetryCallState) -> None:
+        def after(self, retry_state: RetryState) -> None:
             print(self, "after")
 
-        def error_callback(self, retry_state: RetryCallState) -> None:
+        def error_callback(self, retry_state: RetryState) -> None:
             print(self, "error")
             self.raise_retry_error(retry_state)
 
