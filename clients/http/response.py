@@ -42,6 +42,30 @@ class EnhancedResponse:
         return self._response.elapsed
 
     @property
+    def is_info(self) -> bool:
+        return self._response.is_informational
+
+    @property
+    def is_success(self) -> bool:
+        return self._response.is_success
+
+    @property
+    def is_redirect(self) -> bool:
+        return self._response.is_redirect
+
+    @property
+    def is_client_error(self) -> bool:
+        return self._response.is_client_error
+
+    @property
+    def is_server_error(self) -> bool:
+        return self._response.is_server_error
+
+    @property
+    def is_error(self) -> bool:
+        return self._response.is_error
+
+    @property
     def content(self) -> bytes:
         return self._response.content
 

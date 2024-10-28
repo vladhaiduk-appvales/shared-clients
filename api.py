@@ -3,6 +3,7 @@ import secrets
 
 import uvicorn
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 
 app = FastAPI()
 
@@ -30,6 +31,21 @@ async def read_posts() -> list[dict]:
         {"title": "Introduction to Python Generators"},
         {"title": "Mastering Python Decorators"},
     ]
+
+
+@app.get("/redirect")
+async def read_redirect() -> JSONResponse:
+    return JSONResponse(status_code=300, content={"redirect": "Redirecting"})
+
+
+@app.get("/client-error")
+async def read_client_error() -> JSONResponse:
+    return JSONResponse(status_code=400, content={"error": "Client Error"})
+
+
+@app.get("/server-error")
+async def read_server_error() -> JSONResponse:
+    return JSONResponse(status_code=500, content={"error": "Server Error"})
 
 
 if __name__ == "__main__":

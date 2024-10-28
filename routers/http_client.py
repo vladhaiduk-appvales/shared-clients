@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from clients.http import SyncHttpClient
+from clients.http import HttpRetryStrategy, SyncHttpClient
 from retry import RetryStrategy
 
 router = APIRouter(prefix="/http")
@@ -59,5 +59,16 @@ async def local_retry_usecase() -> list[dict]:
         retry_strategy=RetryStrategy(attempts=3, delay=1),
     ) as client:
         response = client.get("/posts")
+
+    return response.json()
+
+
+@router.get("/local/error")
+async def local_error_usecase() -> dict:
+    with SyncHttpClient(
+        base_url="http://127.0.0.1:5000",
+        retry_strategy=HttpRetryStrategy(attempts=3, delay=1, statuses_to_retry={"server_error"}),
+    ) as client:
+        response = client.get("/server-error")
 
     return response.json()

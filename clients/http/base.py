@@ -2,21 +2,20 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 import httpx
 
 from clients.broker import BrokerClient, BrokerMessageBuilder
 from consts import UNSET, Unset, setattr_if_not_unset
 from loggers import http_clients_logger
+from retry import RetryCallState, RetryStrategy, retry_on_exception, retry_on_result
 
 from .request import EnhancedRequest
 from .response import EnhancedResponse
 
 if TYPE_CHECKING:
     from types import TracebackType
-
-    from retry import RetryStrategy
 
     from .types_ import (
         CertType,
@@ -31,6 +30,42 @@ if TYPE_CHECKING:
         TimeoutType,
         UrlType,
     )
+
+
+class HttpRetryStrategy(RetryStrategy):
+    def __init__(
+        self,
+        *,
+        attempts: int = 0,
+        delay: int = 0,
+        statuses_to_retry: set[Literal["info", "redirect", "client_error", "server_error"]] | None = None,
+    ) -> None:
+        super().__init__(attempts=attempts, delay=delay)
+        self.statuses_to_retry = statuses_to_retry or set()
+
+    @retry_on_exception(exc_types=(httpx.ConnectError, httpx.ConnectTimeout))
+    def retry_on_connection_error(self, error: Exception) -> bool:
+        return True
+
+    @retry_on_result
+    def retry_on_status(self, result: EnhancedResponse) -> bool:
+        if not self.statuses_to_retry:
+            return False
+
+        if "info" in self.statuses_to_retry and result.is_info:
+            return True
+        if "redirect" in self.statuses_to_retry and result.is_redirect:
+            return True
+        if "client_error" in self.statuses_to_retry and result.is_client_error:
+            return True
+        if "server_error" in self.statuses_to_retry and result.is_server_error:  # noqa: SIM103
+            return True
+
+        return False
+
+    def error_callback(self, retry_state: RetryCallState) -> None:
+        # TODO: Log that all retries have been exhausted.
+        self.raise_retry_error(retry_state)
 
 
 @dataclass
