@@ -5,6 +5,7 @@ from typing import Callable, TypeVar
 
 from tenacity import (
     RetryCallState,
+    RetryError,
     Retrying,
     after_nothing,
     before_nothing,
@@ -172,6 +173,17 @@ class RetryStrategy(metaclass=RetryStrategyMeta):
     def retry(self, fn: Callable[..., WrappedFnR], *args: any, **kwargs: any) -> WrappedFnR:
         return self.retrying(fn, *args, **kwargs)
 
+    def raise_retry_error(self, retry_state: RetryCallState) -> None:
+        """Raise a RetryError based on the given retry state.
+
+        This method is particularly useful for reraising errors within the `error_callback` method.
+        It extracts the outcome from the provided retry state and raises a `RetryError`, ensuring that
+        the original exception context is retained for improved traceability.
+
+        """
+        error = RetryError(retry_state.outcome)
+        raise error from retry_state.outcome.exception()
+
 
 if __name__ == "__main__":
 
@@ -204,6 +216,7 @@ if __name__ == "__main__":
 
         def error_callback(self, retry_state: RetryCallState) -> None:
             print(self, "error")
+            self.raise_retry_error(retry_state)
 
     class CustomRetryStrategyChild(CustomRetryStrategy):
         @retry_on_exception(exc_types=TypeError)
