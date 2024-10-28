@@ -6,6 +6,8 @@ from typing import Callable, TypeVar
 from tenacity import (
     RetryCallState,
     Retrying,
+    after_nothing,
+    before_nothing,
     retry_any,
     retry_base,
     retry_if_exception,
@@ -162,6 +164,8 @@ class RetryStrategy(metaclass=RetryStrategyMeta):
             wait=wait_fixed(self.delay),
             # By default, it retries on any exception.
             retry=retry_if_exception_type() if self._retry_base is retry_never else self._retry_base,
+            before=getattr(self, "before", before_nothing),
+            after=getattr(self, "after", after_nothing),
         )
 
     def retry(self, fn: Callable[..., WrappedFnR], *args: any, **kwargs: any) -> WrappedFnR:
@@ -171,6 +175,9 @@ class RetryStrategy(metaclass=RetryStrategyMeta):
 if __name__ == "__main__":
 
     class CustomRetryStrategy(RetryStrategy):
+        def before(self, retry_state: RetryCallState) -> None:
+            print(self, "before")
+
         @retry
         def retry_on_xxx(self, retry_state: RetryCallState) -> bool:
             print("retry_on_xxx")
@@ -190,6 +197,9 @@ if __name__ == "__main__":
         def retry_on_yyy(self, retry_state: RetryCallState) -> bool:
             print("retry_on_yyy")
             return False
+
+        def after(self, retry_state: RetryCallState) -> None:
+            print(self, "after")
 
     class CustomRetryStrategyChild(CustomRetryStrategy):
         @retry_on_exception(exc_types=TypeError)
