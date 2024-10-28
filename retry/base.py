@@ -166,6 +166,7 @@ class RetryStrategy(metaclass=RetryStrategyMeta):
             retry=retry_if_exception_type() if self._retry_base is retry_never else self._retry_base,
             before=getattr(self, "before", before_nothing),
             after=getattr(self, "after", after_nothing),
+            retry_error_callback=getattr(self, "error_callback", None),
         )
 
     def retry(self, fn: Callable[..., WrappedFnR], *args: any, **kwargs: any) -> WrappedFnR:
@@ -175,9 +176,6 @@ class RetryStrategy(metaclass=RetryStrategyMeta):
 if __name__ == "__main__":
 
     class CustomRetryStrategy(RetryStrategy):
-        def before(self, retry_state: RetryCallState) -> None:
-            print(self, "before")
-
         @retry
         def retry_on_xxx(self, retry_state: RetryCallState) -> bool:
             print("retry_on_xxx")
@@ -198,8 +196,14 @@ if __name__ == "__main__":
             print("retry_on_yyy")
             return False
 
+        def before(self, retry_state: RetryCallState) -> None:
+            print(self, "before")
+
         def after(self, retry_state: RetryCallState) -> None:
             print(self, "after")
+
+        def error_callback(self, retry_state: RetryCallState) -> None:
+            print(self, "error")
 
     class CustomRetryStrategyChild(CustomRetryStrategy):
         @retry_on_exception(exc_types=TypeError)
@@ -209,7 +213,7 @@ if __name__ == "__main__":
 
     def fn() -> None:
         print("main start")
-        raise TypeError("some value error")
+        raise TypeError("some type error")
         print("main end")
 
     retry_strategy = CustomRetryStrategyChild(attempts=3, delay=1)
