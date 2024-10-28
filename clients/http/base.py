@@ -393,6 +393,7 @@ class SyncHttpClient:
         if self.broker_client and self.broker_message_builder:
             message = self.broker_message_builder.build(enhanced_request, response, details)
             if message:
+                http_clients_logger.info(f"Sending HTTP request [{details['request_label']}] message to broker")
                 self.broker_client.send_message(message=message)
 
         return response
