@@ -45,26 +45,45 @@ class HttpRetryStrategy(RetryStrategy):
 
     @retry_on_exception(exc_types=(httpx.ConnectError, httpx.ConnectTimeout))
     def retry_on_connection_error(self, error: Exception) -> bool:
+        http_clients_logger.info(
+            f"Marking HTTP request for retry due to connection error: {type(error).__name__} - {error}"
+        )
         return True
 
     @retry_on_result
     def retry_on_status(self, result: EnhancedResponse) -> bool:
-        if not self.statuses_to_retry:
+        if result.is_success or not self.statuses_to_retry:
             return False
 
-        if "info" in self.statuses_to_retry and result.is_info:
-            return True
-        if "redirect" in self.statuses_to_retry and result.is_redirect:
-            return True
-        if "client_error" in self.statuses_to_retry and result.is_client_error:
-            return True
-        if "server_error" in self.statuses_to_retry and result.is_server_error:  # noqa: SIM103
+        if (
+            ("info" in self.statuses_to_retry and result.is_info)
+            or ("redirect" in self.statuses_to_retry and result.is_redirect)
+            or ("client_error" in self.statuses_to_retry and result.is_client_error)
+            or ("server_error" in self.statuses_to_retry and result.is_server_error)
+        ):
+            http_clients_logger.info(f"Marking HTTP request for retry due to status code: {result.status_code}")
             return True
 
         return False
 
+    def before(self, retry_state: RetryCallState) -> None:
+        request = retry_state.kwargs.get("request") or retry_state.args[0]
+        details = retry_state.kwargs["details"]
+
+        http_clients_logger.info(
+            f"Retrying HTTP request [{details['request_label']}] ({retry_state.attempt_number}/{self.attempts}): "
+            f"{request.method} {request.url}"
+        )
+
     def error_callback(self, retry_state: RetryCallState) -> None:
-        # TODO: Log that all retries have been exhausted.
+        request = retry_state.kwargs.get("request") or retry_state.args[0]
+        details = retry_state.kwargs["details"]
+
+        http_clients_logger.info(
+            f"All retry attempts ({retry_state.attempt_number}/{self.attempts}) failed for HTTP request "
+            f"[{details['request_label']}]: {request.method} {request.url}"
+        )
+
         self.raise_retry_error(retry_state)
 
 

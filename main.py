@@ -27,6 +27,9 @@ logging.config.dictConfig(
         "version": 1,
         "disable_existing_loggers": False,
         "formatters": {
+            "default": {
+                "format": "%(levelname)s %(asctime)s %(message)s",
+            },
             "json": {
                 "format": "%(levelname)s %(asctime)s %(message)s",
                 "()": "pythonjsonlogger.jsonlogger.JsonFormatter",
@@ -36,7 +39,7 @@ logging.config.dictConfig(
         "handlers": {
             "console": {
                 "class": "logging.StreamHandler",
-                "formatter": "json",
+                "formatter": "default",
             },
         },
         "loggers": {
