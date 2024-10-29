@@ -29,7 +29,7 @@ class SQSMessageBuilder(BrokerMessageBuilder):
         return {"DataType": "Binary", "BinaryListValues": values}
 
 
-class BaseSQSClient:
+class SQSClientBase:
     def __init__(self, *, log_attributes: bool = False, log_body: bool = False) -> None:
         self.log_attributes = log_attributes
         self.log_body = log_body
@@ -62,7 +62,7 @@ class SQSClientMeta(OptionalSingletonMeta, ABCMeta):
     pass
 
 
-class SQSClient(BaseSQSClient, BrokerClient, metaclass=SQSClientMeta):
+class SQSClient(SQSClientBase, BrokerClient, metaclass=SQSClientMeta):
     def __init__(
         self,
         queue_url: str,
@@ -72,7 +72,7 @@ class SQSClient(BaseSQSClient, BrokerClient, metaclass=SQSClientMeta):
         log_body: bool = False,
     ) -> None:
         BrokerClient.__init__(self, queue_url)
-        BaseSQSClient.__init__(self, log_attributes=log_attributes, log_body=log_body)
+        SQSClientBase.__init__(self, log_attributes=log_attributes, log_body=log_body)
 
         self.region_name = region_name
         self._client = None
@@ -108,12 +108,12 @@ class SQSClient(BaseSQSClient, BrokerClient, metaclass=SQSClientMeta):
             return response
 
 
-class AsyncSQSClient(BaseSQSClient, AsyncBrokerClient, metaclass=SQSClientMeta):
+class AsyncSQSClient(SQSClientBase, AsyncBrokerClient, metaclass=SQSClientMeta):
     def __init__(
         self, queue_url: str, region_name: str, *, log_attributes: bool = False, log_body: bool = False
     ) -> None:
         AsyncBrokerClient.__init__(self, queue_url)
-        BaseSQSClient.__init__(self, log_attributes=log_attributes, log_body=log_body)
+        SQSClientBase.__init__(self, log_attributes=log_attributes, log_body=log_body)
 
         self.region_name = region_name
         self._client = None

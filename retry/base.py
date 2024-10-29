@@ -133,7 +133,7 @@ class RetryStrategyMeta(type):
         return super().__new__(cls, name, bases, namespace)
 
 
-class BaseRetryStrategy(metaclass=RetryStrategyMeta):
+class RetryStrategyBase(metaclass=RetryStrategyMeta):
     def __init__(self, *, attempts: int = 0, delay: int = 0) -> None:
         self.attempts = attempts
         self.delay = delay
@@ -183,7 +183,7 @@ class BaseRetryStrategy(metaclass=RetryStrategyMeta):
 WrappedFnR = TypeVar("WrappedFnR")
 
 
-class RetryStrategy(BaseRetryStrategy):
+class RetryStrategy(RetryStrategyBase):
     @cached_property
     def retrying(self) -> Retrying:
         return Retrying(**self._retrying_kwargs)
@@ -192,7 +192,7 @@ class RetryStrategy(BaseRetryStrategy):
         return self.retrying(fn, *args, **kwargs)
 
 
-class AsyncRetryStrategy(BaseRetryStrategy):
+class AsyncRetryStrategy(RetryStrategyBase):
     @cached_property
     def retrying(self) -> AsyncRetrying:
         return AsyncRetrying(**self._retrying_kwargs)

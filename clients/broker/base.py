@@ -28,12 +28,12 @@ class BrokerMessageBuilder(ABC):
         pass
 
 
-class BaseBrokerClient:
+class BrokerClientBase:
     def __init__(self, queue_url: str) -> None:
         self.queue_url = queue_url
 
 
-class BrokerClient(BaseBrokerClient, ABC):
+class BrokerClient(BrokerClientBase, ABC):
     @abstractmethod
     def connect(self) -> any:
         pass
@@ -47,7 +47,7 @@ class BrokerClient(BaseBrokerClient, ABC):
         pass
 
 
-class AsyncBrokerClient(BaseBrokerClient, ABC):
+class AsyncBrokerClient(BrokerClientBase, ABC):
     @abstractmethod
     async def connect(self) -> any:
         pass

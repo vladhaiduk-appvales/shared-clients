@@ -180,7 +180,7 @@ class BrokerHttpMessageBuilder(BrokerMessageBuilder):
         pass
 
 
-class BaseHttpClient:
+class HttpClientBase:
     def request_log(self, request: EnhancedRequest, details: DetailsType) -> tuple[str, dict[str, any]]:
         extra = {"request": {}}
 
@@ -234,7 +234,7 @@ class BaseHttpClient:
         ), extra
 
 
-class HttpClient(BaseHttpClient):
+class HttpClient(HttpClientBase):
     """A wrapper around the HTTPX Client, designed to streamline and extend its functionality to meet our needs.
 
     This client provides an intuitive and extended interface for executing synchronous HTTP requests while maintaining
@@ -598,7 +598,7 @@ class HttpClient(BaseHttpClient):
         )
 
 
-class AsyncHttpClient(BaseHttpClient):
+class AsyncHttpClient(HttpClientBase):
     """A wrapper around the HTTPX AsyncClient, designed to streamline and extend its functionality to meet our needs.
 
     This client provides an intuitive and extended interface for executing asynchronous HTTP requests while maintaining
