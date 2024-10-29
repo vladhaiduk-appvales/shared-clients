@@ -32,8 +32,62 @@ if TYPE_CHECKING:
     )
 
 
-# TODO: Make an async version of it.
 class HttpRetryStrategy(RetryStrategy):
+    def __init__(
+        self,
+        *,
+        attempts: int = 0,
+        delay: int = 0,
+        statuses_to_retry: set[Literal["info", "redirect", "client_error", "server_error"]] | None = None,
+    ) -> None:
+        super().__init__(attempts=attempts, delay=delay)
+        self.statuses_to_retry = statuses_to_retry or set()
+
+    @retry_on_exception(exc_types=(httpx.ConnectError, httpx.ConnectTimeout))
+    def retry_on_connection_error(self, error: Exception) -> bool:
+        http_clients_logger.info(
+            f"Marking HTTP request for retry due to connection error: {type(error).__name__} - {error}"
+        )
+        return True
+
+    @retry_on_result
+    def retry_on_status(self, result: EnhancedResponse) -> bool:
+        if result.is_success or not self.statuses_to_retry:
+            return False
+
+        if (
+            ("info" in self.statuses_to_retry and result.is_info)
+            or ("redirect" in self.statuses_to_retry and result.is_redirect)
+            or ("client_error" in self.statuses_to_retry and result.is_client_error)
+            or ("server_error" in self.statuses_to_retry and result.is_server_error)
+        ):
+            http_clients_logger.info(f"Marking HTTP request for retry due to status code: {result.status_code}")
+            return True
+
+        return False
+
+    def before(self, retry_state: RetryState) -> None:
+        request = retry_state.kwargs.get("request") or retry_state.args[0]
+        details = retry_state.kwargs["details"]
+
+        http_clients_logger.info(
+            f"Retrying HTTP request [{details['request_label']}] ({retry_state.attempt_number}/{self.attempts}): "
+            f"{request.method} {request.url}"
+        )
+
+    def error_callback(self, retry_state: RetryState) -> None:
+        request = retry_state.kwargs.get("request") or retry_state.args[0]
+        details = retry_state.kwargs["details"]
+
+        http_clients_logger.info(
+            f"All retry attempts ({retry_state.attempt_number}/{self.attempts}) failed for HTTP request "
+            f"[{details['request_label']}]: {request.method} {request.url}"
+        )
+
+        self.raise_retry_error(retry_state)
+
+
+class AsyncHttpRetryStrategy(AsyncRetryStrategy):
     def __init__(
         self,
         *,
@@ -126,7 +180,61 @@ class BrokerHttpMessageBuilder(BrokerMessageBuilder):
         pass
 
 
-class HttpClient:
+class BaseHttpClient:
+    def request_log(self, request: EnhancedRequest, details: DetailsType) -> tuple[str, dict[str, any]]:
+        extra = {"request": {}}
+
+        if self.request_log_config.request_name:
+            extra["request"]["name"] = details["request_name"]
+        if self.request_log_config.request_tag:
+            extra["request"]["tag"] = details["request_tag"]
+        if self.request_log_config.request_method:
+            extra["request"]["method"] = request.method
+        if self.request_log_config.request_url:
+            extra["request"]["url"] = request.url
+        if self.request_log_config.request_headers:
+            extra["request"]["headers"] = request.headers
+        if self.request_log_config.request_body:
+            extra["request"]["body"] = request.text
+
+        if not extra["request"]:
+            del extra["request"]
+
+        return f"Sending HTTP request [{details['request_label']}]: {request.method} {request.url}", extra
+
+    def response_log(self, response: EnhancedResponse, details: DetailsType) -> tuple[str, dict[str, any]]:
+        extra = {"request": {}, "response": {}}
+
+        if self.response_log_config.request_name:
+            extra["request"]["name"] = details["request_name"]
+        if self.response_log_config.request_tag:
+            extra["request"]["tag"] = details["request_tag"]
+        if self.response_log_config.request_method:
+            extra["request"]["method"] = response.request.method
+        if self.response_log_config.request_url:
+            extra["request"]["url"] = response.request.url
+
+        if self.response_log_config.response_status_code:
+            extra["response"]["status_code"] = response.status_code
+        if self.response_log_config.response_headers:
+            extra["response"]["headers"] = response.headers
+        if self.response_log_config.response_body:
+            extra["response"]["body"] = response.text
+        if self.response_log_config.response_elapsed_time:
+            extra["response"]["elapsed_time"] = response.elapsed.total_seconds()
+
+        if not extra["request"]:
+            del extra["request"]
+        if not extra["response"]:
+            del extra["response"]
+
+        return (
+            f"HTTP response received [{details['request_label']}]: "
+            f"{response.request.method} {response.request.url} -> {response.status_code}"
+        ), extra
+
+
+class HttpClient(BaseHttpClient):
     """A wrapper around the HTTPX Client, designed to streamline and extend its functionality to meet our needs.
 
     This client provides an intuitive and extended interface for executing synchronous HTTP requests while maintaining
@@ -274,58 +382,6 @@ class HttpClient:
     ) -> None:
         self._local_client.__exit__(exc_type, exc_value, traceback)
         self.close()
-
-    def request_log(self, request: EnhancedRequest, details: DetailsType) -> tuple[str, dict[str, any]]:
-        extra = {"request": {}}
-
-        if self.request_log_config.request_name:
-            extra["request"]["name"] = details["request_name"]
-        if self.request_log_config.request_tag:
-            extra["request"]["tag"] = details["request_tag"]
-        if self.request_log_config.request_method:
-            extra["request"]["method"] = request.method
-        if self.request_log_config.request_url:
-            extra["request"]["url"] = request.url
-        if self.request_log_config.request_headers:
-            extra["request"]["headers"] = request.headers
-        if self.request_log_config.request_body:
-            extra["request"]["body"] = request.text
-
-        if not extra["request"]:
-            del extra["request"]
-
-        return f"Sending HTTP request [{details['request_label']}]: {request.method} {request.url}", extra
-
-    def response_log(self, response: EnhancedResponse, details: DetailsType) -> tuple[str, dict[str, any]]:
-        extra = {"request": {}, "response": {}}
-
-        if self.response_log_config.request_name:
-            extra["request"]["name"] = details["request_name"]
-        if self.response_log_config.request_tag:
-            extra["request"]["tag"] = details["request_tag"]
-        if self.response_log_config.request_method:
-            extra["request"]["method"] = response.request.method
-        if self.response_log_config.request_url:
-            extra["request"]["url"] = response.request.url
-
-        if self.response_log_config.response_status_code:
-            extra["response"]["status_code"] = response.status_code
-        if self.response_log_config.response_headers:
-            extra["response"]["headers"] = response.headers
-        if self.response_log_config.response_body:
-            extra["response"]["body"] = response.text
-        if self.response_log_config.response_elapsed_time:
-            extra["response"]["elapsed_time"] = response.elapsed.total_seconds()
-
-        if not extra["request"]:
-            del extra["request"]
-        if not extra["response"]:
-            del extra["response"]
-
-        return (
-            f"HTTP response received [{details['request_label']}]: "
-            f"{response.request.method} {response.request.url} -> {response.status_code}"
-        ), extra
 
     def _send_request(
         self, request: EnhancedRequest, *, auth: httpx.Auth | None = None, details: DetailsType
@@ -542,7 +598,7 @@ class HttpClient:
         )
 
 
-class AsyncHttpClient:
+class AsyncHttpClient(BaseHttpClient):
     """A wrapper around the HTTPX AsyncClient, designed to streamline and extend its functionality to meet our needs.
 
     This client provides an intuitive and extended interface for executing asynchronous HTTP requests while maintaining
@@ -690,58 +746,6 @@ class AsyncHttpClient:
     ) -> None:
         await self._local_client.__aexit__(exc_type, exc_value, traceback)
         await self.close()
-
-    def request_log(self, request: EnhancedRequest, details: DetailsType) -> tuple[str, dict[str, any]]:
-        extra = {"request": {}}
-
-        if self.request_log_config.request_name:
-            extra["request"]["name"] = details["request_name"]
-        if self.request_log_config.request_tag:
-            extra["request"]["tag"] = details["request_tag"]
-        if self.request_log_config.request_method:
-            extra["request"]["method"] = request.method
-        if self.request_log_config.request_url:
-            extra["request"]["url"] = request.url
-        if self.request_log_config.request_headers:
-            extra["request"]["headers"] = request.headers
-        if self.request_log_config.request_body:
-            extra["request"]["body"] = request.text
-
-        if not extra["request"]:
-            del extra["request"]
-
-        return f"Sending HTTP request [{details['request_label']}]: {request.method} {request.url}", extra
-
-    def response_log(self, response: EnhancedResponse, details: DetailsType) -> tuple[str, dict[str, any]]:
-        extra = {"request": {}, "response": {}}
-
-        if self.response_log_config.request_name:
-            extra["request"]["name"] = details["request_name"]
-        if self.response_log_config.request_tag:
-            extra["request"]["tag"] = details["request_tag"]
-        if self.response_log_config.request_method:
-            extra["request"]["method"] = response.request.method
-        if self.response_log_config.request_url:
-            extra["request"]["url"] = response.request.url
-
-        if self.response_log_config.response_status_code:
-            extra["response"]["status_code"] = response.status_code
-        if self.response_log_config.response_headers:
-            extra["response"]["headers"] = response.headers
-        if self.response_log_config.response_body:
-            extra["response"]["body"] = response.text
-        if self.response_log_config.response_elapsed_time:
-            extra["response"]["elapsed_time"] = response.elapsed.total_seconds()
-
-        if not extra["request"]:
-            del extra["request"]
-        if not extra["response"]:
-            del extra["response"]
-
-        return (
-            f"HTTP response received [{details['request_label']}]: "
-            f"{response.request.method} {response.request.url} -> {response.status_code}"
-        ), extra
 
     async def _send_request(
         self, request: EnhancedRequest, *, auth: httpx.Auth | None = None, details: DetailsType

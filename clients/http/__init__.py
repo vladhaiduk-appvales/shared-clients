@@ -2,6 +2,7 @@ from httpx import Auth, BasicAuth
 
 from .base import (
     AsyncHttpClient,
+    AsyncHttpRetryStrategy,
     BrokerHttpMessageBuilder,
     HttpClient,
     HttpRequestLogConfig,
