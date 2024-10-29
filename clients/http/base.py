@@ -126,7 +126,7 @@ class BrokerHttpMessageBuilder(BrokerMessageBuilder):
         pass
 
 
-class SyncHttpClient:
+class HttpClient:
     """A wrapper around the HTTPX Client, designed to streamline and extend its functionality to meet our needs.
 
     This client provides an intuitive and extended interface for executing synchronous HTTP requests while maintaining
@@ -203,7 +203,7 @@ class SyncHttpClient:
         response_log_config: HttpResponseLogConfig | Unset = UNSET,
         broker_client: BrokerClient | None | Unset = UNSET,
         broker_message_builder: BrokerHttpMessageBuilder | None | Unset = UNSET,
-    ) -> SyncHttpClient:
+    ) -> None:
         setattr_if_not_unset(cls, "base_url", base_url)
         setattr_if_not_unset(cls, "base_params", base_params)
         setattr_if_not_unset(cls, "base_headers", base_headers)
@@ -619,7 +619,7 @@ class AsyncHttpClient:
         response_log_config: HttpResponseLogConfig | Unset = UNSET,
         broker_client: BrokerClient | None | Unset = UNSET,
         broker_message_builder: BrokerHttpMessageBuilder | None | Unset = UNSET,
-    ) -> SyncHttpClient:
+    ) -> None:
         setattr_if_not_unset(cls, "base_url", base_url)
         setattr_if_not_unset(cls, "base_params", base_params)
         setattr_if_not_unset(cls, "base_headers", base_headers)
@@ -799,8 +799,6 @@ class AsyncHttpClient:
             "auth": auth if auth is not UNSET else self.auth,
             "details": details,
         }
-
-        print("djhddh")
 
         retry_strategy = retry_strategy if retry_strategy is not UNSET else self.retry_strategy
         response = await (

@@ -10,11 +10,11 @@ from fastapi import FastAPI
 
 from clients.broker import SQSClient
 from clients.http import (
+    HttpClient,
     SQSSupplierMessageBuilder,
+    SupplierClient,
     SupplierRequestLogConfig,
     SupplierResponseLogConfig,
-    SyncHttpClient,
-    SyncSupplierClient,
 )
 from routers import http_client_router, supplier_client_router
 
@@ -60,10 +60,10 @@ logging.config.dictConfig(
 async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     print("Startup")
 
-    SyncHttpClient.configure(base_url="https://httpbin.org", timeout=None)
-    SyncHttpClient.open_global()
+    HttpClient.configure(base_url="https://httpbin.org", timeout=None)
+    HttpClient.open_global()
 
-    SyncSupplierClient.configure(
+    SupplierClient.configure(
         supplier_code="RCL",
         base_url="https://httpbin.org",
         request_log_config=SupplierRequestLogConfig(
@@ -86,12 +86,12 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
             disallowed_request_tags={None},
         ),
     )
-    SyncSupplierClient.open_global()
+    SupplierClient.open_global()
 
     yield
 
-    SyncHttpClient.close_global()
-    SyncSupplierClient.close_global()
+    HttpClient.close_global()
+    SupplierClient.close_global()
 
     print("Shutdown")
 

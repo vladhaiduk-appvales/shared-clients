@@ -11,7 +11,7 @@ from clients.broker import SQSMessageBuilder
 from consts import UNSET, Unset, setattr_if_not_unset
 from utils.text import compress_and_encode, mask_card_number, mask_series_code
 
-from .base import BrokerHttpMessageBuilder, HttpRequestLogConfig, HttpResponseLogConfig, SyncHttpClient
+from .base import BrokerHttpMessageBuilder, HttpClient, HttpRequestLogConfig, HttpResponseLogConfig
 
 if TYPE_CHECKING:
     import httpx
@@ -102,7 +102,7 @@ class SQSSupplierMessageBuilder(BrokerHttpMessageBuilder, SQSMessageBuilder):
         )
 
 
-class SyncSupplierClient(SyncHttpClient):
+class SupplierClient(HttpClient):
     service_name: str | None = None
     supplier_code: str | None = None
 
