@@ -107,7 +107,7 @@ class SupplierClient(HttpClient):
     supplier_code: str | None = None
 
     # We redefine all class-level attributes to stop them from taking values from the parent class.
-    base_url: UrlType | None = None
+    base_url: UrlType = ""
     base_params: ParamsType | None = None
     base_headers: ParamsType | None = None
     cookies: CookiesType | None = None
@@ -129,7 +129,7 @@ class SupplierClient(HttpClient):
         *,
         service_name: str | None | Unset = UNSET,
         supplier_code: str | None | Unset = UNSET,
-        base_url: UrlType | None | Unset = UNSET,
+        base_url: UrlType | Unset = UNSET,
         base_params: ParamsType | None | Unset = UNSET,
         base_headers: HeadersType | None | Unset = UNSET,
         cookies: CookiesType | None | Unset = UNSET,
@@ -168,7 +168,7 @@ class SupplierClient(HttpClient):
         *,
         service_name: str | None | Unset = UNSET,
         supplier_code: str | None | Unset = UNSET,
-        base_url: UrlType | None | Unset = UNSET,
+        base_url: UrlType | Unset = UNSET,
         base_params: ParamsType | None | Unset = UNSET,
         base_headers: HeadersType | None | Unset = UNSET,
         cookies: CookiesType | None | Unset = UNSET,
