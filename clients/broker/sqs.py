@@ -43,12 +43,20 @@ class SQSClient(BrokerClient, metaclass=SQSClientMeta):
         self.log_attributes = log_attributes
         self.log_body = log_body
 
-        self._client = boto3.client(
-            "sqs",
-            region_name=self.region_name,
-            # TODO: Remove this in prod.
-            endpoint_url="http://localhost:4566",
-        )
+        self._client = None
+
+    def connect(self) -> None:
+        if not self._client:
+            self._client = boto3.client(
+                "sqs",
+                region_name=self.region_name,
+                # TODO: Remove this in prod.
+                endpoint_url="http://localhost:4566",
+            )
+
+    def disconnect(self) -> None:
+        if self._client:
+            self._client.close()
 
     def send_message(self, message: BrokerMessage) -> any:
         try:

@@ -33,5 +33,13 @@ class BrokerClient(ABC):
         self.queue_url = queue_url
 
     @abstractmethod
+    def connect(self) -> any:
+        pass
+
+    @abstractmethod
+    def disconnect(self) -> any:
+        pass
+
+    @abstractmethod
     def send_message(self, message: BrokerMessage) -> any:
         pass

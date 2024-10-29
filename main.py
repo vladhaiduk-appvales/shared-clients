@@ -63,6 +63,15 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     HttpClient.configure(base_url="https://httpbin.org", timeout=None)
     HttpClient.open_global()
 
+    sqs_clinet = SQSClient(
+        queue_url="http://sqs.eu-north-1.localhost.localstack.cloud:4566/000000000000/UtilsQueue",
+        region_name="eu-north-1",
+        log_attributes=True,
+        log_body=True,
+        singleton=True,
+    )
+    sqs_clinet.connect()
+
     SupplierClient.configure(
         supplier_code="RCL",
         base_url="https://httpbin.org",
@@ -74,13 +83,7 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
             response_headers=True,
             response_body=True,
         ),
-        broker_client=SQSClient(
-            queue_url="http://sqs.eu-north-1.localhost.localstack.cloud:4566/000000000000/UtilsQueue",
-            region_name="eu-north-1",
-            log_attributes=True,
-            log_body=True,
-            singleton=True,
-        ),
+        broker_client=sqs_clinet,
         broker_message_builder=SQSSupplierMessageBuilder(
             allowed_request_names={"LOCAL"},
             disallowed_request_tags={None},
@@ -92,6 +95,8 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
 
     HttpClient.close_global()
     SupplierClient.close_global()
+
+    sqs_clinet.disconnect()
 
     print("Shutdown")
 
