@@ -11,4 +11,10 @@ from .base import (
 )
 from .request import EnhancedRequest, Request
 from .response import EnhancedResponse, Response
-from .supplier import SQSSupplierMessageBuilder, SupplierClient, SupplierRequestLogConfig, SupplierResponseLogConfig
+from .supplier import (
+    AsyncSupplierClient,
+    SQSSupplierMessageBuilder,
+    SupplierClient,
+    SupplierRequestLogConfig,
+    SupplierResponseLogConfig,
+)
