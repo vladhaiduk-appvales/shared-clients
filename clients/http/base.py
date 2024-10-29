@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Literal
 
 import httpx
 
-from clients.broker import BrokerClient, BrokerMessageBuilder
+from clients.broker import AsyncBrokerClient, BrokerClient, BrokerMessageBuilder
 from consts import UNSET, Unset, setattr_if_not_unset
 from loggers import http_clients_logger
 from retry import AsyncRetryStrategy, RetryState, RetryStrategy, retry_on_exception, retry_on_result
@@ -562,7 +562,7 @@ class AsyncHttpClient:
     retry_strategy: AsyncRetryStrategy | None = None
     request_log_config: HttpRequestLogConfig = HttpRequestLogConfig()
     response_log_config: HttpResponseLogConfig = HttpResponseLogConfig()
-    broker_client: BrokerClient | None = None
+    broker_client: AsyncBrokerClient | None = None
     broker_message_builder: BrokerHttpMessageBuilder | None = None
 
     _global_client: httpx.AsyncClient | None = None
@@ -581,7 +581,7 @@ class AsyncHttpClient:
         retry_strategy: AsyncRetryStrategy | None | Unset = UNSET,
         request_log_config: HttpRequestLogConfig | None | Unset = UNSET,
         response_log_config: HttpResponseLogConfig | Unset = UNSET,
-        broker_client: BrokerClient | None | Unset = UNSET,
+        broker_client: AsyncBrokerClient | None | Unset = UNSET,
         broker_message_builder: BrokerHttpMessageBuilder | None | Unset = UNSET,
     ) -> None:
         # Instance-level attributes do not delete class-level attributes; they simply shadow them.
@@ -617,7 +617,7 @@ class AsyncHttpClient:
         retry_strategy: AsyncRetryStrategy | None | Unset = UNSET,
         request_log_config: HttpRequestLogConfig | None | Unset = UNSET,
         response_log_config: HttpResponseLogConfig | Unset = UNSET,
-        broker_client: BrokerClient | None | Unset = UNSET,
+        broker_client: AsyncBrokerClient | None | Unset = UNSET,
         broker_message_builder: BrokerHttpMessageBuilder | None | Unset = UNSET,
     ) -> None:
         setattr_if_not_unset(cls, "base_url", base_url)
@@ -811,8 +811,7 @@ class AsyncHttpClient:
             message = self.broker_message_builder.build(enhanced_request, response, details)
             if message:
                 http_clients_logger.info(f"Sending HTTP request [{details['request_label']}] message to broker")
-                # TODO: and we of course need to await in here :D
-                self.broker_client.send_message(message=message)
+                await self.broker_client.send_message(message=message)
 
         return response
 

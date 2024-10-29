@@ -1,2 +1,2 @@
 from .base import AsyncBrokerClient, BrokerClient, BrokerMessage, BrokerMessageBuilder
-from .sqs import SQSClient, SQSMessageBuilder
+from .sqs import AsyncSQSClient, SQSClient, SQSMessageBuilder
