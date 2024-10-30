@@ -66,6 +66,7 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     sqs_clinet = SQSClient(
         queue_url="http://sqs.eu-north-1.localhost.localstack.cloud:4566/000000000000/UtilsQueue",
         region_name="eu-north-1",
+        endpoint_url="http://localhost:4566",
         log_attributes=True,
         log_body=True,
         singleton=True,

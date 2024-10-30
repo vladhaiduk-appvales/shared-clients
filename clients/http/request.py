@@ -4,11 +4,10 @@ Request = httpx.Request
 
 
 class EnhancedRequest:
-    """Enhanced HTTPX Request Wrapper.
+    """Enhanced HTTPX `Request` Wrapper.
 
-    A wrapper around the httpx.Request object that exposes essential properties and methods,
-    while providing additional functionality for enhanced usability.
-
+    This class wraps an `httpx.Request` object, providing easy access to its essential properties
+    and methods, with additional functionality for improved usability in handling HTTP requests.
     """
 
     def __init__(self, request: Request) -> None:

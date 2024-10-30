@@ -7,11 +7,10 @@ Response = httpx.Response
 
 
 class EnhancedResponse:
-    """Enhanced HTTPX Response Wrapper.
+    """Enhanced HTTPX `Response` Wrapper.
 
-    A wrapper around the httpx.Response object that exposes essential properties and methods,
-    while providing additional functionality for enhanced usability.
-
+    This class wraps an `httpx.Response` object, providing easy access to its essential properties
+    and methods, with additional functionality for improved usability in handling HTTP responses.
     """
 
     def __init__(self, response: Response) -> None:

@@ -7,9 +7,9 @@ from typing import TYPE_CHECKING, Literal
 import httpx
 
 from clients.broker import AsyncBrokerClient, BrokerClient, BrokerMessageBuilder
-from consts import UNSET, Unset, setattr_if_not_unset
 from loggers import http_clients_logger
 from retry import AsyncRetryStrategy, RetryState, RetryStrategy, retry_on_exception, retry_on_result
+from utils.unset import UNSET, Unset, setattr_if_not_unset
 
 from .request import EnhancedRequest
 from .response import EnhancedResponse
@@ -33,6 +33,12 @@ if TYPE_CHECKING:
 
 
 class HttpRetryStrategy(RetryStrategy):
+    """Retry strategy class for synchronous HTTP clients.
+
+    It defines methods for retrying requests based on connection errors and specific HTTP statuses.
+    If you want to extend it with custom retry methods, you can inherit from it and define your own methods.
+    """
+
     def __init__(
         self,
         *,
@@ -88,6 +94,12 @@ class HttpRetryStrategy(RetryStrategy):
 
 
 class AsyncHttpRetryStrategy(AsyncRetryStrategy):
+    """Retry strategy class for asynchronous HTTP clients.
+
+    It defines methods for retrying requests based on connection errors and specific HTTP statuses.
+    If you want to extend it with custom retry methods, you can inherit from it and define your own methods.
+    """
+
     def __init__(
         self,
         *,
@@ -144,6 +156,11 @@ class AsyncHttpRetryStrategy(AsyncRetryStrategy):
 
 @dataclass
 class HttpRequestLogConfig:
+    """Configuration for logging HTTP request details.
+
+    This dataclass defines which aspects of an HTTP request should be logged.
+    """
+
     request_name: bool = True
     request_tag: bool = True
     request_method: bool = True
@@ -154,6 +171,11 @@ class HttpRequestLogConfig:
 
 @dataclass
 class HttpResponseLogConfig:
+    """Configuration for logging HTTP response details.
+
+    This dataclass defines which aspects of an HTTP response should be logged.
+    """
+
     request_name: bool = True
     request_tag: bool = True
     request_method: bool = True
@@ -164,8 +186,21 @@ class HttpResponseLogConfig:
     response_body: bool = False
     response_elapsed_time: bool = True
 
+    """Abstract class for building broker messages for HTTP clients.
+
+    This class provides a blueprint for creating a `BrokerMessage` by defining a structure
+    for metadata and message body construction. It ensures a consistent approach to building
+    messages while allowing flexibility for specific implementations.
+    """
+
 
 class BrokerHttpMessageBuilder(BrokerMessageBuilder):
+    """Abstract class for building broker messages from HTTP client requests and responses.
+
+    This class extends `BrokerMessageBuilder` to offer a more specific interface for building broker messages
+    from HTTP client requests and responses.
+    """
+
     def filter(self, request: EnhancedRequest, response: EnhancedResponse, details: DetailsType) -> bool:
         return True
 
@@ -181,6 +216,12 @@ class BrokerHttpMessageBuilder(BrokerMessageBuilder):
 
 
 class HttpClientBase:
+    """Base class for HTTP clients.
+
+    This class describes common attributes and methods for HTTP clients.
+    It serves as a foundation for both synchronous and asynchronous HTTP clients.
+    """
+
     def request_log(self, request: EnhancedRequest, details: DetailsType) -> tuple[str, dict[str, any]]:
         extra = {"request": {}}
 
@@ -235,11 +276,11 @@ class HttpClientBase:
 
 
 class HttpClient(HttpClientBase):
-    """A wrapper around the HTTPX Client, designed to streamline and extend its functionality to meet our needs.
+    """A wrapper around the HTTPX `Client`, designed to streamline and extend its functionality to meet our needs.
 
     This client provides an intuitive and extended interface for executing synchronous HTTP requests while maintaining
-    the core capabilities of the HTTPX Client. It is not a complete wrapper around HTTPX that would allow for replacing
-    HTTPX with another library. Instead, it simply extends the HTTPX Client with the features we need.
+    the core capabilities of the HTTPX `Client`. It is not a complete wrapper around HTTPX that would allow for
+    replacing HTTPX with another library. Instead, it simply extends the HTTPX `Client` with the features we need.
     """
 
     base_url: UrlType = ""
@@ -276,6 +317,7 @@ class HttpClient(HttpClientBase):
         broker_client: BrokerClient | None | Unset = UNSET,
         broker_message_builder: BrokerHttpMessageBuilder | None | Unset = UNSET,
     ) -> None:
+        """Configure local settings for the HTTP client."""
         # Instance-level attributes do not delete class-level attributes; they simply shadow them.
         setattr_if_not_unset(self, "base_url", base_url)
         setattr_if_not_unset(self, "base_params", base_params)
@@ -312,6 +354,7 @@ class HttpClient(HttpClientBase):
         broker_client: BrokerClient | None | Unset = UNSET,
         broker_message_builder: BrokerHttpMessageBuilder | None | Unset = UNSET,
     ) -> None:
+        """Configure global settings for the HTTP client."""
         setattr_if_not_unset(cls, "base_url", base_url)
         setattr_if_not_unset(cls, "base_params", base_params)
         setattr_if_not_unset(cls, "base_headers", base_headers)
@@ -366,6 +409,7 @@ class HttpClient(HttpClientBase):
     @property
     def _client(self) -> httpx.Client:
         if not self._local_client and not self._global_client:
+            # Automatically open the local client if neither local nor global clients are open.
             self.open()
         return self._local_client or self._global_client
 
@@ -599,11 +643,11 @@ class HttpClient(HttpClientBase):
 
 
 class AsyncHttpClient(HttpClientBase):
-    """A wrapper around the HTTPX AsyncClient, designed to streamline and extend its functionality to meet our needs.
+    """A wrapper around the HTTPX `AsyncClient`, designed to streamline and extend its functionality to meet our needs.
 
     This client provides an intuitive and extended interface for executing asynchronous HTTP requests while maintaining
-    the core capabilities of the HTTPX AsyncClient. It is not a complete wrapper around HTTPX that would allow for
-    replacing HTTPX with another library. Instead, it simply extends the HTTPX AsyncClient with the features we need.
+    the core capabilities of the HTTPX `AsyncClient`. It is not a complete wrapper around HTTPX that would allow for
+    replacing HTTPX with another library. Instead, it simply extends the HTTPX `AsyncClient` with the features we need.
     """
 
     base_url: UrlType = ""
@@ -640,6 +684,7 @@ class AsyncHttpClient(HttpClientBase):
         broker_client: AsyncBrokerClient | None | Unset = UNSET,
         broker_message_builder: BrokerHttpMessageBuilder | None | Unset = UNSET,
     ) -> None:
+        """Configure local settings for the HTTP client."""
         # Instance-level attributes do not delete class-level attributes; they simply shadow them.
         setattr_if_not_unset(self, "base_url", base_url)
         setattr_if_not_unset(self, "base_params", base_params)
@@ -676,6 +721,7 @@ class AsyncHttpClient(HttpClientBase):
         broker_client: AsyncBrokerClient | None | Unset = UNSET,
         broker_message_builder: BrokerHttpMessageBuilder | None | Unset = UNSET,
     ) -> None:
+        """Configure global settings for the HTTP client."""
         setattr_if_not_unset(cls, "base_url", base_url)
         setattr_if_not_unset(cls, "base_params", base_params)
         setattr_if_not_unset(cls, "base_headers", base_headers)
@@ -730,6 +776,7 @@ class AsyncHttpClient(HttpClientBase):
     @property
     def _client(self) -> httpx.AsyncClient:
         if not self._local_client and not self._global_client:
+            # Automatically open the local client if neither local nor global clients are open.
             self.open()
         return self._local_client or self._global_client
 

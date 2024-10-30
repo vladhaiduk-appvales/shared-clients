@@ -8,8 +8,8 @@ from typing import TYPE_CHECKING
 from ddtrace import tracer
 
 from clients.broker import SQSMessageBuilder
-from consts import UNSET, Unset, setattr_if_not_unset
 from utils.text import compress_and_encode, mask_card_number, mask_series_code
+from utils.unset import UNSET, Unset, setattr_if_not_unset
 
 from .base import AsyncHttpClient, BrokerHttpMessageBuilder, HttpClient, HttpRequestLogConfig, HttpResponseLogConfig
 
@@ -38,16 +38,34 @@ if TYPE_CHECKING:
 
 @dataclass
 class SupplierRequestLogConfig(HttpRequestLogConfig):
+    """Configuration for logging supplier-specific HTTP request details.
+
+    This dataclass extends `HttpRequestLogConfig` to include additional logging
+    configuration specific to supplier requests.
+    """
+
     supplier_code: bool = True
 
 
 @dataclass
 class SupplierResponseLogConfig(HttpResponseLogConfig):
+    """Configuration for logging supplier-specific HTTP response details.
+
+    This dataclass extends `HttpResponseLogConfig` to include additional logging
+    configuration specific to supplier responses.
+    """
+
     supplier_code: bool = True
 
 
 class SQSSupplierMessageBuilder(BrokerHttpMessageBuilder, SQSMessageBuilder):
-    """A specific implementation of the SQSMessageBuilder for the raw-supplier-message-storage service."""
+    """A specific implementation of the `SQSMessageBuilder` for the raw-supplier-message-storage service.
+
+    This class combines the functionalities of `BrokerHttpMessageBuilder` and `SQSMessageBuilder`
+    to create and filter messages specifically for the raw-supplier-message-storage service.
+    It allows filtering based on request names and tags and builds message metadata and body
+    for storage in an SQS queue.
+    """
 
     def __init__(
         self,
@@ -103,6 +121,12 @@ class SQSSupplierMessageBuilder(BrokerHttpMessageBuilder, SQSMessageBuilder):
 
 
 class SupplierClientBase:
+    """Base class for HTTP supplier clients.
+
+    This class describes common attributes and methods for HTTP supplier clients.
+    It serves as a foundation for both synchronous and asynchronous HTTP supplier clients.
+    """
+
     def request_log(self, request: EnhancedRequest, details: DetailsType) -> tuple[str, dict[str, any]]:
         message, extra = super().request_log(request, details)
         header, body = message.split(":", maxsplit=1)
@@ -121,8 +145,21 @@ class SupplierClientBase:
 
         return f"{header} from [{details['supplier_label']}] supplier:{body}", extra
 
+    """A wrapper around the HTTPX `Client`, designed to streamline and extend its functionality to meet our needs.
+
+    This client provides an intuitive and extended interface for executing synchronous HTTP requests while maintaining
+    the core capabilities of the HTTPX `Client`. It is not a complete wrapper around HTTPX that would allow for
+    replacing HTTPX with another library. Instead, it simply extends the HTTPX `Client` with the features we need.
+    """
+
 
 class SupplierClient(SupplierClientBase, HttpClient):
+    """Synchronous HTTP client for supplier services.
+
+    This class extends `HttpClient` to provide a synchronous HTTP client specifically
+    configured for supplier services.
+    """
+
     service_name: str | None = None
     supplier_code: str | None = None
 
@@ -163,6 +200,7 @@ class SupplierClient(SupplierClientBase, HttpClient):
         broker_client: BrokerClient | None | Unset = UNSET,
         broker_message_builder: BrokerHttpMessageBuilder | None | Unset = UNSET,
     ) -> None:
+        """Configure local settings for the HTTP client."""
         setattr_if_not_unset(self, "service_name", service_name)
         setattr_if_not_unset(self, "supplier_code", supplier_code)
 
@@ -202,6 +240,7 @@ class SupplierClient(SupplierClientBase, HttpClient):
         broker_client: BrokerClient | None | Unset = UNSET,
         broker_message_builder: BrokerHttpMessageBuilder | None | Unset = UNSET,
     ) -> None:
+        """Configure global settings for the HTTP client."""
         setattr_if_not_unset(cls, "service_name", service_name)
         setattr_if_not_unset(cls, "supplier_code", supplier_code)
 
@@ -419,6 +458,12 @@ class SupplierClient(SupplierClientBase, HttpClient):
 
 
 class AsyncSupplierClient(SupplierClientBase, AsyncHttpClient):
+    """Asynchronous HTTP client for supplier services.
+
+    This class extends `AsyncHttpClient` to provide a asynchronous HTTP client specifically
+    configured for supplier services.
+    """
+
     service_name: str | None = None
     supplier_code: str | None = None
 
@@ -459,6 +504,7 @@ class AsyncSupplierClient(SupplierClientBase, AsyncHttpClient):
         broker_client: AsyncBrokerClient | None | Unset = UNSET,
         broker_message_builder: BrokerHttpMessageBuilder | None | Unset = UNSET,
     ) -> None:
+        """Configure local settings for the HTTP client."""
         setattr_if_not_unset(self, "service_name", service_name)
         setattr_if_not_unset(self, "supplier_code", supplier_code)
 
@@ -498,6 +544,7 @@ class AsyncSupplierClient(SupplierClientBase, AsyncHttpClient):
         broker_client: AsyncBrokerClient | None | Unset = UNSET,
         broker_message_builder: BrokerHttpMessageBuilder | None | Unset = UNSET,
     ) -> None:
+        """Configure global settings for the HTTP client."""
         setattr_if_not_unset(cls, "service_name", service_name)
         setattr_if_not_unset(cls, "supplier_code", supplier_code)
 

@@ -13,6 +13,13 @@ from .base import AsyncBrokerClient, BrokerClient, BrokerMessage, BrokerMessageB
 
 
 class SQSMessageBuilder(BrokerMessageBuilder):
+    """Abstract class for building SQS messages.
+
+    This class extends the `BrokerMessageBuilder` to provide utility methods specifically for building SQS messages.
+    It includes methods for creating message attributes with various data types, such as numbers, strings,
+    and binary data.
+    """
+
     def number_attr(self, value: int) -> dict[str, any]:
         return {"DataType": "Number", "StringValue": str(value)}
 
@@ -30,6 +37,12 @@ class SQSMessageBuilder(BrokerMessageBuilder):
 
 
 class SQSClientBase:
+    """Base class for SQS clients.
+
+    This class describes common attributes and methods for SQS clients.
+    It serves as a foundation for both synchronous and asynchronous SQS clients.
+    """
+
     def __init__(self, *, log_attributes: bool = False, log_body: bool = False) -> None:
         self.log_attributes = log_attributes
         self.log_body = log_body
@@ -59,15 +72,22 @@ class SQSClientBase:
 
 # It's necessary to prevent conflicts with the inheritance of BrokerClient and the use of OptionalSingletonMeta.
 class SQSClientMeta(OptionalSingletonMeta, ABCMeta):
-    pass
+    """Meta class for SQS clients.
+
+    This class combines `OptionalSingletonMeta` and `ABCMeta` to prevent conflicts
+    with the inheritance of `BrokerClient` and the use of `OptionalSingletonMeta`.
+    """
 
 
 class SQSClient(SQSClientBase, BrokerClient, metaclass=SQSClientMeta):
+    """Synchronous SQS client."""
+
     def __init__(
         self,
         queue_url: str,
         region_name: str,
         *,
+        endpoint_url: str | None = None,
         log_attributes: bool = False,
         log_body: bool = False,
     ) -> None:
@@ -75,16 +95,12 @@ class SQSClient(SQSClientBase, BrokerClient, metaclass=SQSClientMeta):
         SQSClientBase.__init__(self, log_attributes=log_attributes, log_body=log_body)
 
         self.region_name = region_name
+        self.endpoint_url = endpoint_url
         self._client = None
 
     def connect(self) -> None:
         if not self._client:
-            self._client = boto3.client(
-                "sqs",
-                region_name=self.region_name,
-                # TODO: Remove this in prod.
-                endpoint_url="http://localhost:4566",
-            )
+            self._client = boto3.client("sqs", region_name=self.region_name, endpoint_url=self.endpoint_url)
 
     def disconnect(self) -> None:
         if self._client:
@@ -109,13 +125,22 @@ class SQSClient(SQSClientBase, BrokerClient, metaclass=SQSClientMeta):
 
 
 class AsyncSQSClient(SQSClientBase, AsyncBrokerClient, metaclass=SQSClientMeta):
+    """Asynchronous SQS client."""
+
     def __init__(
-        self, queue_url: str, region_name: str, *, log_attributes: bool = False, log_body: bool = False
+        self,
+        queue_url: str,
+        region_name: str,
+        *,
+        endpoint_url: str | None = None,
+        log_attributes: bool = False,
+        log_body: bool = False,
     ) -> None:
         AsyncBrokerClient.__init__(self, queue_url)
         SQSClientBase.__init__(self, log_attributes=log_attributes, log_body=log_body)
 
         self.region_name = region_name
+        self.endpoint_url = endpoint_url
         self._client = None
 
     async def connect(self) -> None:
@@ -125,8 +150,7 @@ class AsyncSQSClient(SQSClientBase, AsyncBrokerClient, metaclass=SQSClientMeta):
             self._client = await session.client(
                 "sqs",
                 region_name=self.region_name,
-                # TODO: Remove this in prod.
-                endpoint_url="http://localhost:4566",
+                endpoint_url=self.endpoint_url,
             ).__aenter__()
 
     async def disconnect(self) -> None:

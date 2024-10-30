@@ -6,6 +6,12 @@ T = TypeVar("T", bound="SingletonMeta")
 
 
 class SingletonMeta(type):
+    """A metaclass for implementing the Singleton design pattern.
+
+    This metaclass ensures that only one instance of a class is created. If an instance of the class already exists,
+    it returns the existing instance instead of creating a new one.
+    """
+
     _instances: ClassVar[dict[type[T], T]] = {}
 
     def __call__(cls, *args: any, **kwargs: any) -> T:
@@ -16,14 +22,20 @@ class SingletonMeta(type):
 
 
 class OptionalSingletonMeta(SingletonMeta):
+    """A metaclass that allows optional singleton behavior.
+
+    This metaclass extends `SingletonMeta` to provide an option to either return a new instance or maintain singleton
+    behavior based on the `singleton` keyword argument.
+    """
+
     def __call__(cls, *args: any, **kwargs: any) -> T:
         singleton = kwargs.pop("singleton", False)
 
         if singleton:
-            # Use SingletonMeta's __call__ method to ensure singleton behavior.
+            # Use SingletonMeta's `__call__` method to ensure singleton behavior.
             return super().__call__(*args, **kwargs)
 
-        # Use type's __call__ method to create a new instance every time.
+        # Use type's `__call__` method to create a new instance every time.
         return super(SingletonMeta, cls).__call__(*args, **kwargs)
 
 
