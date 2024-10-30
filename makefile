@@ -14,3 +14,6 @@ lint:
 
 fix:
 	ruff check --fix
+
+test:
+	python -m pytest
