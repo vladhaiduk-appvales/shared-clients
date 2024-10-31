@@ -46,7 +46,7 @@ def retry(fn: Callable[[RetryState], bool]) -> Callable[[RetryState], bool]:
 def retry_on_exception(
     fn: Callable[[BaseException], bool] | None = None,
     *,
-    exc_types: BaseException | tuple[BaseException, ...] | None = None,
+    exc_types: type[BaseException] | tuple[type[BaseException], ...] | None = None,
 ) -> Callable[[BaseException], bool]:
     """Decorate a method to check for retry based on exception.
 
