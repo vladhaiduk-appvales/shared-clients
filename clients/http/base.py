@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal
 
 import httpx
+from typing_extensions import Self
 
 from clients.broker import AsyncBrokerClient, BrokerClient, BrokerMessageBuilder
 from loggers import http_clients_logger
@@ -413,7 +414,7 @@ class HttpClient(HttpClientBase):
             self.open()
         return self._local_client or self._global_client
 
-    def __enter__(self) -> httpx.Client:
+    def __enter__(self) -> Self:
         self.open()
         self._local_client.__enter__()
         return self
@@ -780,7 +781,7 @@ class AsyncHttpClient(HttpClientBase):
             self.open()
         return self._local_client or self._global_client
 
-    async def __aenter__(self) -> httpx.AsyncClient:
+    async def __aenter__(self) -> Self:
         self.open()
         await self._local_client.__aenter__()
         return self
