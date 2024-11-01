@@ -1,10 +1,22 @@
 from __future__ import annotations
 
-from typing import Callable
+from typing import Any, Callable
 
 import pytest
 
-from retry.base import RetryStrategyMeta, retry, retry_on_exception, retry_on_result
+from retry.base import (
+    RetryError,
+    RetryState,
+    RetryStrategyBase,
+    RetryStrategyMeta,
+    after_nothing,
+    before_nothing,
+    retry,
+    retry_if_exception_type,
+    retry_never,
+    retry_on_exception,
+    retry_on_result,
+)
 
 
 class TestRetryDecorators:
@@ -49,10 +61,10 @@ class TestRetryDecorators:
     @pytest.mark.parametrize(
         ("exc_types", "input_exc", "expected"),
         [
-            (ValueError, ValueError(), True),
-            ((ValueError, TypeError), TypeError(), True),
-            (ValueError, RuntimeError(), False),
-            ((ValueError, TypeError), RuntimeError(), False),
+            (ValueError, ValueError("value error"), True),
+            ((ValueError, TypeError), TypeError("type error"), True),
+            (ValueError, RuntimeError("runtime error"), False),
+            ((ValueError, TypeError), RuntimeError("runtime error"), False),
         ],
     )
     def test_retry_on_exception_with_exc_types_ignores_other_exceptions(
@@ -162,3 +174,85 @@ class TestRetryStrategyMeta:
             "parent_retry_on_result_method": parent_retry_methods["parent_retry_on_result_method"],
             "retry_on_result_method": retry_methods["retry_on_result_method"],
         }
+
+
+class RetryStrategyObject(RetryStrategyBase):
+    @retry
+    def retry_method(self, retry_state: RetryState) -> bool:
+        return True
+
+    @retry_on_exception
+    def retry_on_exception_method(self, error: BaseException) -> bool:
+        return True
+
+    @retry_on_result
+    def retry_on_result_method(self, result: Any) -> bool:
+        return True
+
+    def before(self, retry_state: RetryState) -> None:
+        pass
+
+    def after(self, retry_state: RetryState) -> None:
+        pass
+
+    def error_callback(self, retry_state: RetryState) -> None:
+        pass
+
+
+class TestRetryStrategyBase:
+    @pytest.fixture
+    def sample_retry_state(self) -> RetryState:
+        return RetryState(None, None, (), {})
+
+    def test_retry_property_returns_default_strategy(self) -> None:
+        base_instance = RetryStrategyBase()
+        assert base_instance._retry == retry_never
+
+    def test_retry_property_returns_custom_strategy(self) -> None:
+        instance = RetryStrategyObject()
+        assert instance._retry.retries.count != retry_never
+
+    def test_retrying_kwargs_property_returns_default_kwargs(self) -> None:
+        base_instance = RetryStrategyBase()
+
+        assert base_instance._retrying_kwargs["stop"].max_attempt_number == 0
+        assert base_instance._retrying_kwargs["wait"].wait_fixed == 0
+        assert isinstance(base_instance._retrying_kwargs["retry"], retry_if_exception_type)
+        assert base_instance._retrying_kwargs["before"] == before_nothing
+        assert base_instance._retrying_kwargs["after"] == after_nothing
+        assert base_instance._retrying_kwargs["retry_error_callback"] is None
+
+    def test_retrying_kwargs_property_returns_custom_kwargs(self) -> None:
+        instance = RetryStrategyObject(attempts=3, delay=1)
+
+        assert instance._retrying_kwargs["stop"].max_attempt_number == 3
+        assert instance._retrying_kwargs["wait"].wait_fixed == 1
+        assert not isinstance(instance._retrying_kwargs["retry"], retry_if_exception_type)
+        assert instance._retrying_kwargs["before"] == instance.before
+        assert instance._retrying_kwargs["after"] == instance.after
+        assert instance._retrying_kwargs["retry_error_callback"] == instance.error_callback
+
+    def test_raise_retry_error_with_exception_raises_error_with_context(self, sample_retry_state: RetryState) -> None:
+        base_instance = RetryStrategyBase()
+
+        exception = ValueError("value error")
+        sample_retry_state.set_exception((type(exception), exception, None))
+
+        with pytest.raises(RetryError) as error:
+            base_instance.raise_retry_error(sample_retry_state)
+
+        assert error.value.__cause__ is exception
+        assert error.value.last_attempt.exception() is exception
+
+    def test_raise_retry_error_with_result_raises_error_without_context(self, sample_retry_state: RetryState) -> None:
+        base_instance = RetryStrategyBase()
+
+        result = object()
+        sample_retry_state.set_result(result)
+
+        with pytest.raises(RetryError) as error:
+            base_instance.raise_retry_error(sample_retry_state)
+
+        assert error.value.__cause__ is None
+        assert error.value.last_attempt.exception() is None
+        assert error.value.last_attempt.result() is result
