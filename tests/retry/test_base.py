@@ -1,12 +1,16 @@
 from __future__ import annotations
 
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 import pytest
 
 from retry.base import (
+    AsyncRetrying,
+    AsyncRetryStrategy,
     RetryError,
+    Retrying,
     RetryState,
+    RetryStrategy,
     RetryStrategyBase,
     RetryStrategyMeta,
     after_nothing,
@@ -17,6 +21,9 @@ from retry.base import (
     retry_on_exception,
     retry_on_result,
 )
+
+if TYPE_CHECKING:
+    from pytest_mock import MockerFixture
 
 
 class TestRetryDecorators:
@@ -256,3 +263,68 @@ class TestRetryStrategyBase:
         assert error.value.__cause__ is None
         assert error.value.last_attempt.exception() is None
         assert error.value.last_attempt.result() is result
+
+
+class TestRetryStrategy:
+    def test_retrying_property_returns_retrying_instance(self) -> None:
+        instance = RetryStrategy(attempts=3, delay=1)
+
+        assert isinstance(instance.retrying, Retrying)
+        assert instance.retrying.stop.max_attempt_number == 3
+        assert instance.retrying.wait.wait_fixed == 1
+        assert isinstance(instance.retrying.retry, retry_if_exception_type)
+        assert instance.retrying.before == before_nothing
+        assert instance.retrying.after == after_nothing
+        assert instance.retrying.retry_error_callback is None
+
+    def test_retrying_property_returns_cached_retrying_instance(self) -> None:
+        instance = RetryStrategy(attempts=3, delay=1)
+        assert instance.retrying is instance.retrying
+
+    def test_retry_calls_retrying_instance(self, mocker: MockerFixture) -> None:
+        instance = RetryStrategy(attempts=3, delay=1)
+        spy_retrying = mocker.spy(instance, "retrying")
+
+        def fn(a: int, b: int) -> int:
+            return a + b
+
+        arg1 = 1
+        arg2 = 2
+
+        result = instance.retry(fn, arg1, arg2)
+
+        assert result == 3
+        spy_retrying.assert_called_once_with(fn, arg1, arg2)
+
+
+class TestAsyncRetryStrategy:
+    def test_retrying_property_returns_retrying_instance(self) -> None:
+        instance = AsyncRetryStrategy(attempts=3, delay=1)
+
+        assert isinstance(instance.retrying, AsyncRetrying)
+        assert instance.retrying.stop.max_attempt_number == 3
+        assert instance.retrying.wait.wait_fixed == 1
+        assert isinstance(instance.retrying.retry, retry_if_exception_type)
+        assert instance.retrying.before == before_nothing
+        assert instance.retrying.after == after_nothing
+        assert instance.retrying.retry_error_callback is None
+
+    def test_retrying_property_returns_cached_retrying_instance(self) -> None:
+        instance = AsyncRetryStrategy(attempts=3, delay=1)
+        assert instance.retrying is instance.retrying
+
+    @pytest.mark.asyncio
+    async def test_retry_calls_retrying_instance(self, mocker: MockerFixture) -> None:
+        instance = AsyncRetryStrategy(attempts=3, delay=1)
+        spy_retrying = mocker.spy(instance, "retrying")
+
+        async def fn(a: int, b: int) -> int:
+            return a + b
+
+        arg1 = 1
+        arg2 = 2
+
+        result = await instance.retry(fn, arg1, arg2)
+
+        assert result == 3
+        spy_retrying.assert_called_once_with(fn, arg1, arg2)
