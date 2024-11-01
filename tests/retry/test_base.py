@@ -186,7 +186,7 @@ class TestRetryStrategyMeta:
         }
 
 
-class RetryStrategyObject(RetryStrategyBase):
+class SampleRetryStrategy(RetryStrategyBase):
     @retry
     def retry_method(self, retry_state: RetryState) -> bool:
         return True
@@ -222,7 +222,7 @@ class TestRetryStrategyBase:
         assert base_instance._retry == retry_never
 
     def test_retry_property_returns_custom_strategy(self) -> None:
-        instance = RetryStrategyObject()
+        instance = SampleRetryStrategy()
         assert instance._retry.retries.count != retry_never
 
     def test_retrying_kwargs_property_returns_default_kwargs(self) -> None:
@@ -236,7 +236,7 @@ class TestRetryStrategyBase:
         assert base_instance._retrying_kwargs["retry_error_callback"] is None
 
     def test_retrying_kwargs_property_returns_custom_kwargs(self) -> None:
-        instance = RetryStrategyObject(attempts=3, delay=1)
+        instance = SampleRetryStrategy(attempts=3, delay=1)
 
         assert instance._retrying_kwargs["stop"].max_attempt_number == 3
         assert instance._retrying_kwargs["wait"].wait_fixed == 1
