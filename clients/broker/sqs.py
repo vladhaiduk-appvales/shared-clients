@@ -71,7 +71,6 @@ class SQSClientBase:
         broker_clients_logger.info("Sent SQS message successfully", extra=extra)
 
 
-# It's necessary to prevent conflicts with the inheritance of BrokerClient and the use of OptionalSingletonMeta.
 class SQSClientMeta(OptionalSingletonMeta, ABCMeta):
     """Meta class for SQS clients.
 
