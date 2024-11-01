@@ -1,5 +1,5 @@
 from collections.abc import Mapping, Sequence
-from typing import Literal, Union
+from typing import Any, Literal, Union
 
 import httpx
 
@@ -15,10 +15,10 @@ CookiesType = Mapping[str, str]
 
 ContentBodyType = str
 # Represents only variations of the JSON type that the client currently needs.
-JsonBodyType = Union[Mapping[str, any], Sequence[dict[str, any]]]
+JsonBodyType = Union[Mapping[str, Any], Sequence[dict[str, Any]]]
 
 ProxyType = str
 CertType = httpx._types.CertTypes
 TimeoutType = float
 
-DetailsType = Mapping[str, any]
+DetailsType = Mapping[str, Any]

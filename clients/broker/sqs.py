@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABCMeta
+from typing import Any
 
 import aioboto3
 import boto3
@@ -20,19 +21,19 @@ class SQSMessageBuilder(BrokerMessageBuilder):
     and binary data.
     """
 
-    def number_attr(self, value: int) -> dict[str, any]:
+    def number_attr(self, value: int) -> dict[str, Any]:
         return {"DataType": "Number", "StringValue": str(value)}
 
-    def string_attr(self, value: any) -> dict[str, any]:
+    def string_attr(self, value: Any) -> dict[str, Any]:
         return {"DataType": "String", "StringValue": str(value)}
 
-    def string_list_attr(self, values: list[any]) -> dict[str, any]:
+    def string_list_attr(self, values: list[Any]) -> dict[str, Any]:
         return {"DataType": "String", "StringListValues": [str(value) for value in values]}
 
-    def binary_attr(self, value: bytes) -> dict[str, any]:
+    def binary_attr(self, value: bytes) -> dict[str, Any]:
         return {"DataType": "Binary", "BinaryValue": value}
 
-    def binary_list_attr(self, values: list[bytes]) -> dict[str, any]:
+    def binary_list_attr(self, values: list[bytes]) -> dict[str, Any]:
         return {"DataType": "Binary", "BinaryListValues": values}
 
 
@@ -106,7 +107,7 @@ class SQSClient(SQSClientBase, BrokerClient, metaclass=SQSClientMeta):
         if self._client:
             self._client.close()
 
-    def send_message(self, message: BrokerMessage) -> any:
+    def send_message(self, message: BrokerMessage) -> Any:
         try:
             response = self._client.send_message(
                 QueueUrl=self.queue_url,
@@ -157,7 +158,7 @@ class AsyncSQSClient(SQSClientBase, AsyncBrokerClient, metaclass=SQSClientMeta):
         if self._client:
             await self._client.__aexit__(None, None, None)
 
-    async def send_message(self, message: BrokerMessage) -> any:
+    async def send_message(self, message: BrokerMessage) -> Any:
         try:
             response = await self._client.send_message(
                 QueueUrl=self.queue_url,

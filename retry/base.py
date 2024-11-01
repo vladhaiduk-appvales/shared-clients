@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from functools import cached_property, partial, wraps
-from typing import Callable, TypeVar
+from typing import Any, Callable, TypeVar
 
 from tenacity import (
     AsyncRetrying,
@@ -61,7 +61,7 @@ def retry_on_exception(
         raise AttributeError(f"method '{fn.__name__}' is already marked for retry on result")
 
     @wraps(fn)
-    def wrapper(self: RetryStrategy, *args: any, **kwargs: any) -> bool:
+    def wrapper(self: RetryStrategy, *args: Any, **kwargs: Any) -> bool:
         if exc_types and isinstance(args[0], exc_types):
             return fn(self, *args, **kwargs)
         return False
@@ -70,7 +70,7 @@ def retry_on_exception(
     return wrapper
 
 
-def retry_on_result(fn: Callable[[any], bool]) -> Callable[[any], bool]:
+def retry_on_result(fn: Callable[[Any], bool]) -> Callable[[Any], bool]:
     """Decorate a method to check for retry based on result.
 
     Methods with this decorator will only execute to check for retry if the method's outcome is not an exception.
@@ -96,7 +96,7 @@ class RetryStrategyMeta(type):
         cls: type[RetryStrategyMeta],
         name: str,
         bases: tuple[type, ...],
-        namespace: dict[str, any],
+        namespace: dict[str, Any],
     ) -> RetryStrategyMeta:
         if RETRY_METHODS_ATTR in namespace:
             raise AttributeError(f"manual definition of the '{RETRY_METHODS_ATTR}' attribute is not allowed")
@@ -171,7 +171,7 @@ class RetryStrategyBase(metaclass=RetryStrategyMeta):
         return retry
 
     @property
-    def _retrying_kwargs(self) -> dict[str, any]:
+    def _retrying_kwargs(self) -> dict[str, Any]:
         return {
             "stop": stop_after_attempt(self.attempts),
             "wait": wait_fixed(self.delay),
@@ -209,7 +209,7 @@ class RetryStrategy(RetryStrategyBase):
     def retrying(self) -> Retrying:
         return Retrying(**self._retrying_kwargs)
 
-    def retry(self, fn: Callable[..., WrappedFnR], *args: any, **kwargs: any) -> WrappedFnR:
+    def retry(self, fn: Callable[..., WrappedFnR], *args: Any, **kwargs: Any) -> WrappedFnR:
         return self.retrying(fn, *args, **kwargs)
 
 
@@ -223,7 +223,7 @@ class AsyncRetryStrategy(RetryStrategyBase):
     def retrying(self) -> AsyncRetrying:
         return AsyncRetrying(**self._retrying_kwargs)
 
-    async def retry(self, fn: Callable[..., WrappedFnR], *args: any, **kwargs: any) -> WrappedFnR:
+    async def retry(self, fn: Callable[..., WrappedFnR], *args: Any, **kwargs: Any) -> WrappedFnR:
         return await self.retrying(fn, *args, **kwargs)
 
 
@@ -241,7 +241,7 @@ if __name__ == "__main__":
             return isinstance(exception, ValueError)
 
         @retry_on_result
-        def retry_on_number(self, result: any) -> bool:
+        def retry_on_number(self, result: Any) -> bool:
             print("retry_on_number")
             return isinstance(result, int)
 

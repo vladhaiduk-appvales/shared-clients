@@ -1,4 +1,5 @@
 import datetime as dt
+from typing import Any
 
 import httpx
 import xmltodict
@@ -72,10 +73,10 @@ class EnhancedResponse:
     def text(self) -> str:
         return self._response.text
 
-    def json(self, **kwargs: any) -> any:
+    def json(self, **kwargs: Any) -> Any:
         return self._response.json(**kwargs)
 
-    def xml(self, **kwargs: any) -> dict[str, any]:
+    def xml(self, **kwargs: Any) -> dict[str, Any]:
         return dict(xmltodict.parse(self.content, **kwargs))
 
     def raise_for_status(self) -> None:

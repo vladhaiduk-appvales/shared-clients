@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass
 class BrokerMessage:
-    metadata: dict[str, any] | None
+    metadata: dict[str, Any] | None
     body: str
 
 
@@ -18,12 +19,12 @@ class BrokerMessageBuilder(ABC):
     messages while allowing flexibility for specific implementations.
     """
 
-    def build(self, *args: any, **kwargs: any) -> BrokerMessage | None:
+    def build(self, *args: Any, **kwargs: Any) -> BrokerMessage | None:
         metadata = self.build_metadata(*args, **kwargs)
         body = self.build_body(*args, **kwargs)
         return BrokerMessage(metadata=metadata, body=body) if self.filter(*args, **kwargs) else None
 
-    def filter(self, *args: any, **kwargs: any) -> bool:
+    def filter(self, *args: Any, **kwargs: Any) -> bool:
         """Determine whether a `BrokerMessage` should be built.
 
         This method acts as a conditional filter that decides if the message building process should proceed.
@@ -33,11 +34,11 @@ class BrokerMessageBuilder(ABC):
         return True
 
     @abstractmethod
-    def build_metadata(self, *args: any, **kwargs: any) -> dict[str, any] | None:
+    def build_metadata(self, *args: Any, **kwargs: Any) -> dict[str, Any] | None:
         pass
 
     @abstractmethod
-    def build_body(self, *args: any, **kwargs: any) -> str:
+    def build_body(self, *args: Any, **kwargs: Any) -> str:
         pass
 
 
@@ -56,15 +57,15 @@ class BrokerClient(BrokerClientBase, ABC):
     """Abstract base class for synchronous broker clients."""
 
     @abstractmethod
-    def connect(self) -> any:
+    def connect(self) -> Any:
         pass
 
     @abstractmethod
-    def disconnect(self) -> any:
+    def disconnect(self) -> Any:
         pass
 
     @abstractmethod
-    def send_message(self, message: BrokerMessage) -> any:
+    def send_message(self, message: BrokerMessage) -> Any:
         pass
 
 
@@ -72,13 +73,13 @@ class AsyncBrokerClient(BrokerClientBase, ABC):
     """Abstract base class for asynchronous broker clients."""
 
     @abstractmethod
-    async def connect(self) -> any:
+    async def connect(self) -> Any:
         pass
 
     @abstractmethod
-    async def disconnect(self) -> any:
+    async def disconnect(self) -> Any:
         pass
 
     @abstractmethod
-    async def send_message(self, message: BrokerMessage) -> any:
+    async def send_message(self, message: BrokerMessage) -> Any:
         pass

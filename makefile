@@ -15,5 +15,8 @@ lint:
 fix:
 	ruff check --fix
 
+check-types:
+	pyright
+
 test:
 	python -m pytest

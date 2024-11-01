@@ -17,6 +17,7 @@ python-json-logger = "^2.0.7"
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.6.9"
 pytest = "^8.3.3"
+pyright = "^1.1.387"
 
 [tool.ruff]
 target-version = "py39"
@@ -25,6 +26,7 @@ line-length = 120
 [tool.ruff.lint]
 select = ["ALL"]
 ignore = [
+  "ANN401",
   "ARG002",
   "C90",
   "COM812",

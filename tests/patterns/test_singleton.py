@@ -1,8 +1,10 @@
+from typing import Any
+
 from patterns.singleton import OptionalSingletonMeta, SingletonMeta
 
 
 class SingletonObject(metaclass=SingletonMeta):
-    def __init__(self, value: any) -> None:
+    def __init__(self, value: Any) -> None:
         self.value = value
 
 
@@ -17,7 +19,7 @@ class TestSingletonMeta:
 
 
 class OptionalSingletonObject(metaclass=OptionalSingletonMeta):
-    def __init__(self, value: any) -> None:
+    def __init__(self, value: Any) -> None:
         self.value = value
 
 

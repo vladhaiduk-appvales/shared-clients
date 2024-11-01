@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import ClassVar, TypeVar
+from typing import Any, ClassVar, TypeVar
 
 T = TypeVar("T", bound="SingletonMeta")
 
@@ -14,7 +14,7 @@ class SingletonMeta(type):
 
     _instances: ClassVar[dict[type[T], T]] = {}
 
-    def __call__(cls, *args: any, **kwargs: any) -> T:
+    def __call__(cls, *args: Any, **kwargs: Any) -> T:
         if cls not in cls._instances:
             instance = super().__call__(*args, **kwargs)
             cls._instances[cls] = instance
@@ -28,7 +28,7 @@ class OptionalSingletonMeta(SingletonMeta):
     behavior based on the `singleton` keyword argument.
     """
 
-    def __call__(cls, *args: any, **kwargs: any) -> T:
+    def __call__(cls, *args: Any, **kwargs: Any) -> T:
         singleton = kwargs.pop("singleton", False)
 
         if singleton:

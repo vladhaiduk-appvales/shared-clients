@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime as dt
 import json
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from ddtrace import tracer
 
@@ -84,7 +84,7 @@ class SQSSupplierMessageBuilder(BrokerHttpMessageBuilder, SQSMessageBuilder):
 
     def build_metadata(
         self, request: EnhancedRequest, response: EnhancedResponse, details: DetailsType
-    ) -> dict[str, any] | None:
+    ) -> dict[str, Any] | None:
         request_label = details["request_label"]
         supplier_label = details["supplier_label"]
         trace_id = details["trace_id"]
@@ -127,7 +127,7 @@ class SupplierClientBase:
     It serves as a foundation for both synchronous and asynchronous HTTP supplier clients.
     """
 
-    def request_log(self, request: EnhancedRequest, details: DetailsType) -> tuple[str, dict[str, any]]:
+    def request_log(self, request: EnhancedRequest, details: DetailsType) -> tuple[str, dict[str, Any]]:
         message, extra = super().request_log(request, details)
         header, body = message.split(":", maxsplit=1)
 
@@ -136,7 +136,7 @@ class SupplierClientBase:
 
         return f"{header} to [{details['supplier_label']}] supplier:{body}", extra
 
-    def response_log(self, response: EnhancedResponse, details: DetailsType) -> tuple[str, dict[str, any]]:
+    def response_log(self, response: EnhancedResponse, details: DetailsType) -> tuple[str, dict[str, Any]]:
         message, extra = super().response_log(response, details)
         header, body = message.split(":", maxsplit=1)
 

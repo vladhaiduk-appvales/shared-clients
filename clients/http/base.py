@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 import httpx
 from typing_extensions import Self
@@ -208,7 +208,7 @@ class BrokerHttpMessageBuilder(BrokerMessageBuilder):
     @abstractmethod
     def build_metadata(
         self, request: EnhancedRequest, response: EnhancedResponse, details: DetailsType
-    ) -> dict[str, any] | None:
+    ) -> dict[str, Any] | None:
         pass
 
     @abstractmethod
@@ -223,7 +223,7 @@ class HttpClientBase:
     It serves as a foundation for both synchronous and asynchronous HTTP clients.
     """
 
-    def request_log(self, request: EnhancedRequest, details: DetailsType) -> tuple[str, dict[str, any]]:
+    def request_log(self, request: EnhancedRequest, details: DetailsType) -> tuple[str, dict[str, Any]]:
         extra = {"request": {}}
 
         if self.request_log_config.request_name:
@@ -244,7 +244,7 @@ class HttpClientBase:
 
         return f"Sending HTTP request [{details['request_label']}]: {request.method} {request.url}", extra
 
-    def response_log(self, response: EnhancedResponse, details: DetailsType) -> tuple[str, dict[str, any]]:
+    def response_log(self, response: EnhancedResponse, details: DetailsType) -> tuple[str, dict[str, Any]]:
         extra = {"request": {}, "response": {}}
 
         if self.response_log_config.request_name:
