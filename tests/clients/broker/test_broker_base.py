@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from clients.broker.base import BrokerMessage, BrokerMessageBuilder
+from clients.broker.base import AsyncBrokerClient, BrokerClient, BrokerClientBase, BrokerMessage, BrokerMessageBuilder
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -58,3 +58,31 @@ class TestBrokerMessageBuilder:
     def test_filter_default_returns_true(self) -> None:
         instance = SampleBrokerMessageBuilder()
         assert instance.filter() is True
+
+
+class TestBrokerClient:
+    def test_is_abstract(self) -> None:
+        assert issubclass(BrokerClient, ABC)
+
+    def test_inherits_broker_client_base(self) -> None:
+        assert issubclass(BrokerClient, ABC)
+
+    def test_has_abstract_methods(self) -> None:
+        assert len(BrokerClient.__abstractmethods__) == 3
+        assert "connect" in BrokerClient.__abstractmethods__
+        assert "disconnect" in BrokerClient.__abstractmethods__
+        assert "send_message" in BrokerClient.__abstractmethods__
+
+
+class TestAsyncBrokerClient:
+    def test_is_abstract(self) -> None:
+        assert issubclass(AsyncBrokerClient, ABC)
+
+    def test_inherits_broker_client_base(self) -> None:
+        assert issubclass(AsyncBrokerClient, BrokerClientBase)
+
+    def test_has_abstract_methods(self) -> None:
+        assert len(AsyncBrokerClient.__abstractmethods__) == 3
+        assert "connect" in AsyncBrokerClient.__abstractmethods__
+        assert "disconnect" in AsyncBrokerClient.__abstractmethods__
+        assert "send_message" in AsyncBrokerClient.__abstractmethods__
