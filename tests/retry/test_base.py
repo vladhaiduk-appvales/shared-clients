@@ -123,6 +123,9 @@ class TestRetryStrategyMeta:
             "retry_on_result_method": retry_on_result(lambda _self, _arg: True),
         }
 
+    def test_is_metaclass(self) -> None:
+        assert issubclass(RetryStrategyMeta, type)
+
     @pytest.mark.parametrize(
         "methods_attr",
         [
@@ -211,6 +214,9 @@ class TestRetryStrategyBase:
     def sample_retry_state(self) -> RetryState:
         return RetryState(None, None, (), {})
 
+    def test_uses_retry_strategy_meta_metaclass(self) -> None:
+        assert isinstance(RetryStrategyBase, RetryStrategyMeta)
+
     def test_retry_property_returns_default_strategy(self) -> None:
         base_instance = RetryStrategyBase()
         assert base_instance._retry == retry_never
@@ -266,6 +272,9 @@ class TestRetryStrategyBase:
 
 
 class TestRetryStrategy:
+    def test_inherits_retry_strategy_base(self) -> None:
+        assert issubclass(RetryStrategy, RetryStrategyBase)
+
     def test_retrying_property_returns_retrying_instance(self) -> None:
         instance = RetryStrategy(attempts=3, delay=1)
 
@@ -298,6 +307,9 @@ class TestRetryStrategy:
 
 
 class TestAsyncRetryStrategy:
+    def test_inherits_retry_strategy_base(self) -> None:
+        assert issubclass(AsyncRetryStrategy, RetryStrategyBase)
+
     def test_retrying_property_returns_retrying_instance(self) -> None:
         instance = AsyncRetryStrategy(attempts=3, delay=1)
 
