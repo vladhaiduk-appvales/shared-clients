@@ -4,7 +4,7 @@ from typing import Callable
 
 import pytest
 
-from retry.base import retry, retry_on_exception, retry_on_result
+from retry.base import RetryStrategyMeta, retry, retry_on_exception, retry_on_result
 
 
 class TestRetryDecorators:
@@ -81,3 +81,84 @@ class TestRetryDecorators:
     ) -> None:
         with pytest.raises(AttributeError, match=error_keywords):
             retry_on_result(retry_decorator(sample_fn))
+
+
+class TestRetryStrategyMeta:
+    @pytest.fixture
+    def parent_retry_methods(self) -> dict[str, Callable]:
+        return {
+            "parent_retry_method": retry(lambda _self, _arg: True),
+            "parent_retry_on_exception_method": retry_on_exception(lambda _self, _arg: True),
+            "parent_retry_on_result_method": retry_on_result(lambda _self, _arg: True),
+        }
+
+    @pytest.fixture
+    def parent_retry_strategy(self, parent_retry_methods: dict[str, Callable]) -> type:
+        return RetryStrategyMeta("ParentRetryStrategy", (object,), parent_retry_methods)
+
+    @pytest.fixture
+    def retry_methods(self) -> dict[str, Callable]:
+        return {
+            "retry_method": retry(lambda _self, _arg: True),
+            "retry_on_exception_method": retry_on_exception(lambda _self, _arg: True),
+            "retry_on_result_method": retry_on_result(lambda _self, _arg: True),
+        }
+
+    @pytest.mark.parametrize(
+        "methods_attr",
+        [
+            "__retry_methods__",
+            "__retry_on_exception_methods__",
+            "__retry_on_result_methods__",
+        ],
+    )
+    def test_namespace_with_predefined_retry_methods_raises_attribute_error(self, methods_attr: str) -> None:
+        with pytest.raises(AttributeError, match=methods_attr):
+            RetryStrategyMeta("RetryStrategy", (object,), {methods_attr: {}})
+
+    def test_namespace_without_retry_methods_returns_updated_class(self) -> None:
+        cls = RetryStrategyMeta("RetryStrategy", (object,), {})
+
+        assert cls.__retry_methods__ == {}
+        assert cls.__retry_on_exception_methods__ == {}
+        assert cls.__retry_on_result_methods__ == {}
+
+    def test_parent_with_retry_methods_returns_updated_class(
+        self, parent_retry_strategy: type, parent_retry_methods: dict[str, Callable]
+    ) -> None:
+        cls = RetryStrategyMeta("RetryStrategy", (parent_retry_strategy,), {})
+
+        assert cls.__retry_methods__ == {"parent_retry_method": parent_retry_methods["parent_retry_method"]}
+        assert cls.__retry_on_exception_methods__ == {
+            "parent_retry_on_exception_method": parent_retry_methods["parent_retry_on_exception_method"]
+        }
+        assert cls.__retry_on_result_methods__ == {
+            "parent_retry_on_result_method": parent_retry_methods["parent_retry_on_result_method"]
+        }
+
+    def test_namespace_with_retry_methods_returns_updated_class(self, retry_methods: dict[str, Callable]) -> None:
+        cls = RetryStrategyMeta("RetryStrategy", (object,), retry_methods)
+
+        assert cls.__retry_methods__ == {"retry_method": retry_methods["retry_method"]}
+        assert cls.__retry_on_exception_methods__ == {
+            "retry_on_exception_method": retry_methods["retry_on_exception_method"]
+        }
+        assert cls.__retry_on_result_methods__ == {"retry_on_result_method": retry_methods["retry_on_result_method"]}
+
+    def test_parent_and_namespace_with_retry_methods_returns_updated_class(
+        self, parent_retry_strategy: type, parent_retry_methods: dict[str, Callable], retry_methods: dict[str, Callable]
+    ) -> None:
+        cls = RetryStrategyMeta("RetryStrategy", (parent_retry_strategy,), retry_methods)
+
+        assert cls.__retry_methods__ == {
+            "parent_retry_method": parent_retry_methods["parent_retry_method"],
+            "retry_method": retry_methods["retry_method"],
+        }
+        assert cls.__retry_on_exception_methods__ == {
+            "parent_retry_on_exception_method": parent_retry_methods["parent_retry_on_exception_method"],
+            "retry_on_exception_method": retry_methods["retry_on_exception_method"],
+        }
+        assert cls.__retry_on_result_methods__ == {
+            "parent_retry_on_result_method": parent_retry_methods["parent_retry_on_result_method"],
+            "retry_on_result_method": retry_methods["retry_on_result_method"],
+        }
