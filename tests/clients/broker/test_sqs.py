@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import pytest
+from botocore.exceptions import BotoCoreError, ClientError
 
-from clients.broker.base import BrokerMessageBuilder
-from clients.broker.sqs import SQSMessageBuilder
+from clients.broker.base import BrokerMessage, BrokerMessageBuilder
+from clients.broker.sqs import SQSClientBase, SQSMessageBuilder
 
 
 class SampleSQSMessageBuilder(SQSMessageBuilder):
@@ -56,3 +58,39 @@ class TestSQSMessageBuilder:
             "DataType": "Binary",
             "BinaryListValues": [b"value1", b"value2"],
         }
+
+
+class TestSQSClientBase:
+    def test_log_client_error(self, caplog: pytest.LogCaptureFixture) -> None:
+        error_response = {
+            "Error": {
+                "Code": "NoSuchBucket",
+                "Message": "The specified bucket does not exist",
+                "BucketName": "sample-bucket",
+            }
+        }
+        operation_name = "ListBuckets"
+
+        with caplog.at_level(logging.ERROR):
+            SQSClientBase().log_client_error(ClientError(error_response, operation_name))
+
+        assert len(caplog.records) == 1
+        assert "ClientError" in caplog.text
+        assert error_response["Error"]["Code"] in caplog.text
+        assert error_response["Error"]["Message"] in caplog.text
+
+    def test_log_boto_core_error(self, caplog: pytest.LogCaptureFixture) -> None:
+        with caplog.at_level(logging.ERROR):
+            SQSClientBase().log_boto_core_error(BotoCoreError())
+
+        assert len(caplog.records) == 1
+        assert "BotoCoreError" in caplog.text
+
+    def test_log_success(self, caplog: pytest.LogCaptureFixture) -> None:
+        message = BrokerMessage(metadata={"key": "value"}, body="body")
+
+        with caplog.at_level(logging.INFO):
+            SQSClientBase().log_success(message)
+
+        assert len(caplog.records) == 1
+        assert "success" in caplog.text
