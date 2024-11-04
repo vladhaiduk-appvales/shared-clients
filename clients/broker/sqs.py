@@ -99,11 +99,11 @@ class SQSClient(SQSClientBase, BrokerClient, metaclass=SQSClientMeta):
         self._client = None
 
     def connect(self) -> None:
-        if not self._client:
+        if self._client is None:
             self._client = boto3.client("sqs", region_name=self.region_name, endpoint_url=self.endpoint_url)
 
     def disconnect(self) -> None:
-        if self._client:
+        if self._client is not None:
             self._client.close()
 
     def send_message(self, message: BrokerMessage) -> Any:
@@ -144,7 +144,7 @@ class AsyncSQSClient(SQSClientBase, AsyncBrokerClient, metaclass=SQSClientMeta):
         self._client = None
 
     async def connect(self) -> None:
-        if not self._client:
+        if self._client is None:
             session = aioboto3.Session()
             # Since aioboto3 enforces the use of the async context manager, we need to call `__aenter__`.
             self._client = await session.client(
@@ -154,7 +154,7 @@ class AsyncSQSClient(SQSClientBase, AsyncBrokerClient, metaclass=SQSClientMeta):
             ).__aenter__()
 
     async def disconnect(self) -> None:
-        if self._client:
+        if self._client is not None:
             await self._client.__aexit__(None, None, None)
 
     async def send_message(self, message: BrokerMessage) -> Any:
@@ -173,11 +173,3 @@ class AsyncSQSClient(SQSClientBase, AsyncBrokerClient, metaclass=SQSClientMeta):
         else:
             self.log_success(message)
             return response
-
-
-if __name__ == "__main__":
-    client_1 = SQSClient("url", "region", singleton=True)
-    client_2 = SQSClient(singleton=True)
-
-    print(client_1 is client_2)  # False
-    print(client_1.queue_url, client_2.queue_url)  # url url
