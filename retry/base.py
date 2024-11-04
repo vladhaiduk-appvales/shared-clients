@@ -193,7 +193,7 @@ class RetryStrategyBase(metaclass=RetryStrategyMeta):
         the original exception context is retained for improved traceability.
         """
         error = RetryError(retry_state.outcome)
-        raise error from retry_state.outcome.exception()
+        raise error from retry_state.outcome.exception() if retry_state.outcome else None
 
 
 WrappedFnR = TypeVar("WrappedFnR")

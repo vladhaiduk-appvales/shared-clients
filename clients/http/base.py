@@ -123,7 +123,7 @@ class HttpRetryStrategy(RetryStrategy):
         request = retry_state.kwargs.get("request") or retry_state.args[0]
         details = retry_state.kwargs["details"]
 
-        http_clients_logger.info(
+        http_clients_logger.error(
             f"All retry attempts ({retry_state.attempt_number}/{self.attempts}) failed for HTTP request "
             f"[{details['request_label']}]: {request.method} {request.url}"
         )
@@ -221,7 +221,7 @@ class AsyncHttpRetryStrategy(AsyncRetryStrategy):
         request = retry_state.kwargs.get("request") or retry_state.args[0]
         details = retry_state.kwargs["details"]
 
-        http_clients_logger.info(
+        http_clients_logger.error(
             f"All retry attempts ({retry_state.attempt_number}/{self.attempts}) failed for HTTP request "
             f"[{details['request_label']}]: {request.method} {request.url}"
         )
