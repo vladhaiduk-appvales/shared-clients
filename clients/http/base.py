@@ -45,10 +45,17 @@ class HttpRetryStrategy(RetryStrategy):
         *,
         attempts: int = 0,
         delay: int = 0,
-        statuses_to_retry: set[Literal["info", "redirect", "client_error", "server_error"]] | None = None,
+        on_timeouts: bool = False,
+        on_network_errors: bool = False,
+        on_protocol_errors: bool = False,
+        on_statuses: set[Literal["info", "redirect", "client_error", "server_error"]] | None = None,
     ) -> None:
         super().__init__(attempts=attempts, delay=delay)
-        self.statuses_to_retry = statuses_to_retry or set()
+
+        self.on_timeouts = on_timeouts
+        self.on_network_errors = on_network_errors
+        self.on_protocol_errors = on_protocol_errors
+        self.on_statuses = on_statuses or set()
 
     @retry_on_exception(exc_types=(httpx.ConnectError, httpx.ConnectTimeout))
     def retry_on_connection_error(self, error: Exception) -> bool:
@@ -57,16 +64,46 @@ class HttpRetryStrategy(RetryStrategy):
         )
         return True
 
+    @retry_on_exception(exc_types=httpx.TimeoutException)
+    def retry_on_timeout_error(self, error: Exception) -> bool:
+        if self.on_timeouts:
+            http_clients_logger.info(
+                f"Marking HTTP request for retry due to timeout error: {type(error).__name__} - {error}"
+            )
+            return True
+
+        return False
+
+    @retry_on_exception(exc_types=httpx.NetworkError)
+    def retry_on_network_error(self, error: Exception) -> bool:
+        if self.on_network_errors:
+            http_clients_logger.info(
+                f"Marking HTTP request for retry due to network error: {type(error).__name__} - {error}"
+            )
+            return True
+
+        return False
+
+    @retry_on_exception(exc_types=httpx.ProtocolError)
+    def retry_on_protocol_error(self, error: Exception) -> bool:
+        if self.on_protocol_errors:
+            http_clients_logger.info(
+                f"Marking HTTP request for retry due to protocol error: {type(error).__name__} - {error}"
+            )
+            return True
+
+        return False
+
     @retry_on_result
     def retry_on_status(self, result: EnhancedResponse) -> bool:
-        if result.is_success or not self.statuses_to_retry:
+        if result.is_success or not self.on_statuses:
             return False
 
         if (
-            ("info" in self.statuses_to_retry and result.is_info)
-            or ("redirect" in self.statuses_to_retry and result.is_redirect)
-            or ("client_error" in self.statuses_to_retry and result.is_client_error)
-            or ("server_error" in self.statuses_to_retry and result.is_server_error)
+            ("info" in self.on_statuses and result.is_info)
+            or ("redirect" in self.on_statuses and result.is_redirect)
+            or ("client_error" in self.on_statuses and result.is_client_error)
+            or ("server_error" in self.on_statuses and result.is_server_error)
         ):
             http_clients_logger.info(f"Marking HTTP request for retry due to status code: {result.status_code}")
             return True
@@ -106,10 +143,17 @@ class AsyncHttpRetryStrategy(AsyncRetryStrategy):
         *,
         attempts: int = 0,
         delay: int = 0,
-        statuses_to_retry: set[Literal["info", "redirect", "client_error", "server_error"]] | None = None,
+        on_timeouts: bool = False,
+        on_network_errors: bool = False,
+        on_protocol_errors: bool = False,
+        on_statuses: set[Literal["info", "redirect", "client_error", "server_error"]] | None = None,
     ) -> None:
         super().__init__(attempts=attempts, delay=delay)
-        self.statuses_to_retry = statuses_to_retry or set()
+
+        self.on_timeouts = on_timeouts
+        self.on_network_errors = on_network_errors
+        self.on_protocol_errors = on_protocol_errors
+        self.on_statuses = on_statuses or set()
 
     @retry_on_exception(exc_types=(httpx.ConnectError, httpx.ConnectTimeout))
     def retry_on_connection_error(self, error: Exception) -> bool:
@@ -118,16 +162,46 @@ class AsyncHttpRetryStrategy(AsyncRetryStrategy):
         )
         return True
 
+    @retry_on_exception(exc_types=httpx.TimeoutException)
+    def retry_on_timeout_error(self, error: Exception) -> bool:
+        if self.on_timeouts:
+            http_clients_logger.info(
+                f"Marking HTTP request for retry due to timeout error: {type(error).__name__} - {error}"
+            )
+            return True
+
+        return False
+
+    @retry_on_exception(exc_types=httpx.NetworkError)
+    def retry_on_network_error(self, error: Exception) -> bool:
+        if self.on_network_errors:
+            http_clients_logger.info(
+                f"Marking HTTP request for retry due to network error: {type(error).__name__} - {error}"
+            )
+            return True
+
+        return False
+
+    @retry_on_exception(exc_types=httpx.ProtocolError)
+    def retry_on_protocol_error(self, error: Exception) -> bool:
+        if self.on_protocol_errors:
+            http_clients_logger.info(
+                f"Marking HTTP request for retry due to protocol error: {type(error).__name__} - {error}"
+            )
+            return True
+
+        return False
+
     @retry_on_result
     def retry_on_status(self, result: EnhancedResponse) -> bool:
-        if result.is_success or not self.statuses_to_retry:
+        if result.is_success or not self.on_statuses:
             return False
 
         if (
-            ("info" in self.statuses_to_retry and result.is_info)
-            or ("redirect" in self.statuses_to_retry and result.is_redirect)
-            or ("client_error" in self.statuses_to_retry and result.is_client_error)
-            or ("server_error" in self.statuses_to_retry and result.is_server_error)
+            ("info" in self.on_statuses and result.is_info)
+            or ("redirect" in self.on_statuses and result.is_redirect)
+            or ("client_error" in self.on_statuses and result.is_client_error)
+            or ("server_error" in self.on_statuses and result.is_server_error)
         ):
             http_clients_logger.info(f"Marking HTTP request for retry due to status code: {result.status_code}")
             return True
@@ -186,13 +260,6 @@ class HttpResponseLogConfig:
     response_headers: bool = False
     response_body: bool = False
     response_elapsed_time: bool = True
-
-    """Abstract class for building broker messages for HTTP clients.
-
-    This class provides a blueprint for creating a `BrokerMessage` by defining a structure
-    for metadata and message body construction. It ensures a consistent approach to building
-    messages while allowing flexibility for specific implementations.
-    """
 
 
 class BrokerHttpMessageBuilder(BrokerMessageBuilder):

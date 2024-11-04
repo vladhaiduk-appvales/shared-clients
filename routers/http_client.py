@@ -84,7 +84,7 @@ async def local_retry_usecase() -> list[dict]:
 async def local_error_usecase() -> dict:
     with HttpClient(
         base_url="http://127.0.0.1:5000",
-        retry_strategy=HttpRetryStrategy(attempts=3, delay=1, statuses_to_retry={"server_error"}),
+        retry_strategy=HttpRetryStrategy(attempts=3, delay=1, on_statuses={"server_error"}),
     ) as client:
         response = client.get("/server-error")
 
