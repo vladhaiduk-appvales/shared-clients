@@ -5,10 +5,16 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from clients.http.base import HttpClientBase
+from clients.broker.sqs import SQSMessageBuilder
+from clients.http.base import BrokerHttpMessageBuilder, HttpClientBase
 from clients.http.request import EnhancedRequest, Request
 from clients.http.response import EnhancedResponse, Response
-from clients.http.supplier import SupplierClientBase, SupplierRequestLogConfig, SupplierResponseLogConfig
+from clients.http.supplier import (
+    SQSSupplierMessageBuilder,
+    SupplierClientBase,
+    SupplierRequestLogConfig,
+    SupplierResponseLogConfig,
+)
 
 if TYPE_CHECKING:
     from clients.http.types_ import DetailsType
@@ -35,6 +41,100 @@ def sample_details() -> DetailsType:
         "supplier_code": "SUPPLIER",
         "supplier_label": "SUPPLIER-LABEL",
     }
+
+
+class TestSQSSupplierMessageBuilder:
+    def test_inherits_broker_http_message_builder(self) -> None:
+        assert issubclass(SQSSupplierMessageBuilder, BrokerHttpMessageBuilder)
+
+    def test_inherits_sqs_message_builder(self) -> None:
+        assert issubclass(SQSSupplierMessageBuilder, SQSMessageBuilder)
+
+    @pytest.mark.parametrize(
+        ("allowed_request_names", "disallowed_request_tags", "expected"),
+        [
+            (None, None, False),
+            ({"REQUEST"}, None, True),
+            ({"UNKNOWN"}, None, False),
+            ({"REQUEST"}, {"TEST"}, False),
+            ({"REQUEST"}, {"UNKNOWN"}, True),
+        ],
+    )
+    def test_filter(
+        self,
+        allowed_request_names: set[str] | None,
+        disallowed_request_tags: str[str] | None,
+        expected: bool,
+        sample_request: EnhancedRequest,
+        sample_response: EnhancedResponse,
+        sample_details: DetailsType,
+    ) -> None:
+        result = SQSSupplierMessageBuilder(
+            allowed_request_names=allowed_request_names, disallowed_request_tags=disallowed_request_tags
+        ).filter(sample_request, sample_response, sample_details)
+        assert result is expected
+
+    @pytest.mark.parametrize(
+        ("details", "expected_static_attrs"),
+        [
+            (
+                {
+                    "request_label": "REQUEST-TEST",
+                    "supplier_label": "SUPPLIER-LABEL",
+                    "trace_id": "123",
+                },
+                {
+                    "MessageType": {"DataType": "String", "StringValue": "REQUEST-TEST"},
+                    "SupplierCode": {"DataType": "String", "StringValue": "SUPPLIER-LABEL"},
+                    "TraceId": {"DataType": "String", "StringValue": "123"},
+                },
+            ),
+            (
+                {
+                    "request_label": "REQUEST-TEST",
+                    "supplier_label": "SUPPLIER-LABEL",
+                    "trace_id": "123",
+                    "tenant_id": "456",
+                    "tenant_name": "TENANT",
+                    "order_id": "789",
+                    "booking_ref": "000",
+                },
+                {
+                    "MessageType": {"DataType": "String", "StringValue": "REQUEST-TEST"},
+                    "SupplierCode": {"DataType": "String", "StringValue": "SUPPLIER-LABEL"},
+                    "TraceId": {"DataType": "String", "StringValue": "123"},
+                    "TenantId": {"DataType": "String", "StringValue": "456"},
+                    "TenantName": {"DataType": "String", "StringValue": "TENANT"},
+                    "OrderId": {"DataType": "String", "StringValue": "789"},
+                    "BookingRef": {"DataType": "String", "StringValue": "000"},
+                },
+            ),
+        ],
+    )
+    def test_build_metadata(
+        self,
+        details: DetailsType,
+        expected_static_attrs: dict[str, any],
+        sample_request: EnhancedRequest,
+        sample_response: EnhancedResponse,
+    ) -> None:
+        result = SQSSupplierMessageBuilder().build_metadata(sample_request, sample_response, details)
+
+        for attr, value in expected_static_attrs.items():
+            assert result[attr] == value
+
+        assert result["TimeStamp"]["DataType"] == "String"
+
+        try:
+            dt.datetime.fromisoformat(result["TimeStamp"]["StringValue"])
+        except Exception:
+            pytest.fail("Invalid TimeStamp")
+
+    def test_build_body(
+        self, sample_request: EnhancedRequest, sample_response: EnhancedResponse, sample_details: DetailsType
+    ) -> None:
+        result = SQSSupplierMessageBuilder().build_body(sample_request, sample_response, sample_details)
+        assert result == '{"request": "eJwDAAAAAAE=", "response": "eJwDAAAAAAE="}'
 
 
 class SampleSupplierClient(SupplierClientBase):
