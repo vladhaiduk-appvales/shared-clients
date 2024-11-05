@@ -1,23 +1,56 @@
+from __future__ import annotations
+
+import datetime as dt
 import logging
+from typing import TYPE_CHECKING, Any
 
 import httpx
 import pytest
 
-from clients.http.base import AsyncHttpRetryStrategy, HttpRetryStrategy
+from clients.broker.base import BrokerMessageBuilder
+from clients.http.base import (
+    AsyncHttpClient,
+    AsyncHttpRetryStrategy,
+    BrokerHttpMessageBuilder,
+    HttpClient,
+    HttpClientBase,
+    HttpRequestLogConfig,
+    HttpResponseLogConfig,
+    HttpRetryStrategy,
+)
 from clients.http.request import EnhancedRequest, Request
 from clients.http.response import EnhancedResponse, Response
 from retry.base import AsyncRetryStrategy, RetryError, RetryState, RetryStrategy
 
+if TYPE_CHECKING:
+    from clients.http.types_ import DetailsType
+
+
+@pytest.fixture
+def sample_request() -> EnhancedRequest:
+    return EnhancedRequest(Request("GET", "http://example.com"))
+
+
+@pytest.fixture
+def sample_response(sample_request: EnhancedRequest) -> EnhancedResponse:
+    response = Response(200, request=sample_request._request)
+    response._elapsed = dt.timedelta(seconds=1)
+    return EnhancedResponse(response)
+
+
+@pytest.fixture
+def sample_details() -> DetailsType:
+    return {
+        "request_name": "REQUEST",
+        "request_tag": "TEST",
+        "request_label": "REQUEST-TEST",
+    }
+
 
 class TestHttpRetryStrategy:
     @pytest.fixture
-    def sample_retry_state(self) -> RetryState:
-        return RetryState(
-            None,
-            None,
-            (EnhancedRequest(Request("GET", "http://example.com")),),
-            {"details": {"request_label": "REQUEST-TEST"}},
-        )
+    def sample_retry_state(self, sample_request: EnhancedRequest, sample_details: DetailsType) -> RetryState:
+        return RetryState(None, None, (sample_request,), {"details": sample_details})
 
     def test_inherits_retry_strategy(self) -> None:
         assert issubclass(HttpRetryStrategy, RetryStrategy)
@@ -295,3 +328,188 @@ class TestAsyncHttpRetryStrategy:
         assert "failed for HTTP request" in caplog.text
         assert "REQUEST-TEST" in caplog.text
         assert "GET http://example.com" in caplog.text
+
+
+class SampleBrokerHttpMessageBuilder(BrokerHttpMessageBuilder):
+    def build_metadata(
+        self, request: EnhancedRequest, response: EnhancedResponse, details: DetailsType
+    ) -> dict[str, Any] | None:
+        return {"key": "value"}
+
+    def build_body(self, request: EnhancedRequest, response: EnhancedResponse, details: DetailsType) -> str:
+        return "body"
+
+
+class TestBrokerHttpMessageBuilder:
+    def test_inherits_broker_message_builder(self) -> None:
+        assert issubclass(BrokerHttpMessageBuilder, BrokerMessageBuilder)
+
+    def test_has_abstract_methods(self) -> None:
+        assert len(BrokerHttpMessageBuilder.__abstractmethods__) == 2
+        assert "build_metadata" in BrokerHttpMessageBuilder.__abstractmethods__
+        assert "build_body" in BrokerHttpMessageBuilder.__abstractmethods__
+
+    def test_filter_default_returns_true(
+        self, sample_request: EnhancedRequest, sample_response: EnhancedResponse, sample_details: DetailsType
+    ) -> None:
+        instance = SampleBrokerHttpMessageBuilder()
+        assert instance.filter(sample_request, sample_response, sample_details) is True
+
+
+class SampleHttpClient(HttpClientBase):
+    def __init__(
+        self,
+        request_log_config: HttpRequestLogConfig | None = None,
+        response_log_config: HttpResponseLogConfig | None = None,
+    ) -> None:
+        self.request_log_config = request_log_config or HttpRequestLogConfig()
+        self.response_log_config = response_log_config or HttpResponseLogConfig()
+
+
+class TestHttpClientBase:
+    @pytest.mark.parametrize(
+        ("log_config", "expected_extra"),
+        [
+            (
+                None,
+                {
+                    "request": {
+                        "name": "REQUEST",
+                        "tag": "TEST",
+                        "method": "GET",
+                        "url": "http://example.com",
+                    }
+                },
+            ),
+            (
+                HttpRequestLogConfig(
+                    request_name=True,
+                    request_tag=True,
+                    request_method=True,
+                    request_url=True,
+                    request_headers=True,
+                    request_body=True,
+                ),
+                {
+                    "request": {
+                        "name": "REQUEST",
+                        "tag": "TEST",
+                        "method": "GET",
+                        "url": "http://example.com",
+                        "headers": {"host": "example.com"},
+                        "body": "",
+                    }
+                },
+            ),
+            (
+                HttpRequestLogConfig(
+                    request_name=False,
+                    request_tag=False,
+                    request_method=False,
+                    request_url=False,
+                    request_headers=False,
+                    request_body=False,
+                ),
+                {},
+            ),
+        ],
+    )
+    def test_request_log(
+        self,
+        log_config: HttpRequestLogConfig | None,
+        expected_extra: dict,
+        sample_request: EnhancedRequest,
+        sample_details: DetailsType,
+    ) -> None:
+        message, extra = SampleHttpClient(request_log_config=log_config).request_log(sample_request, sample_details)
+
+        assert "Sending HTTP request" in message
+        assert "REQUEST-TEST" in message
+        assert "GET http://example.com" in message
+
+        assert extra == expected_extra
+
+    @pytest.mark.parametrize(
+        ("log_config", "expected_extra"),
+        [
+            (
+                None,
+                {
+                    "request": {
+                        "name": "REQUEST",
+                        "tag": "TEST",
+                        "method": "GET",
+                        "url": "http://example.com",
+                    },
+                    "response": {
+                        "status_code": 200,
+                        "elapsed_time": 1.0,
+                    },
+                },
+            ),
+            (
+                HttpResponseLogConfig(
+                    request_name=True,
+                    request_tag=True,
+                    request_method=True,
+                    request_url=True,
+                    response_status_code=True,
+                    response_headers=True,
+                    response_body=True,
+                    response_elapsed_time=True,
+                ),
+                {
+                    "request": {
+                        "name": "REQUEST",
+                        "tag": "TEST",
+                        "method": "GET",
+                        "url": "http://example.com",
+                    },
+                    "response": {
+                        "status_code": 200,
+                        "headers": {},
+                        "body": "",
+                        "elapsed_time": 1.0,
+                    },
+                },
+            ),
+            (
+                HttpResponseLogConfig(
+                    request_name=False,
+                    request_tag=False,
+                    request_method=False,
+                    request_url=False,
+                    response_status_code=False,
+                    response_headers=False,
+                    response_body=False,
+                    response_elapsed_time=False,
+                ),
+                {},
+            ),
+        ],
+    )
+    def test_response_log(
+        self,
+        log_config: HttpResponseLogConfig | None,
+        expected_extra: dict,
+        sample_response: EnhancedResponse,
+        sample_details: DetailsType,
+    ) -> None:
+        message, extra = SampleHttpClient(response_log_config=log_config).response_log(sample_response, sample_details)
+
+        assert "HTTP response received" in message
+        assert "REQUEST-TEST" in message
+        assert "GET http://example.com" in message
+        assert "200" in message
+
+        assert extra == expected_extra
+
+
+class TestHttpClient:
+    def test_inherits_http_client_base(self) -> None:
+        assert issubclass(HttpClient, HttpClientBase)
+
+
+class TestAsyncHttpClient:
+    def test_inherits_http_client_base(self) -> None:
+        assert issubclass(AsyncHttpClient, HttpClientBase)
