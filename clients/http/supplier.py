@@ -11,7 +11,14 @@ from clients.broker import SQSMessageBuilder
 from utils.text import compress_and_encode, mask_card_number, mask_series_code
 from utils.unset import UNSET, Unset, setattr_if_not_unset
 
-from .base import AsyncHttpClient, BrokerHttpMessageBuilder, HttpClient, HttpRequestLogConfig, HttpResponseLogConfig
+from .base import (
+    AsyncHttpClient,
+    BrokerHttpMessageBuilder,
+    HttpClient,
+    HttpClientBase,
+    HttpRequestLogConfig,
+    HttpResponseLogConfig,
+)
 
 if TYPE_CHECKING:
     import httpx
@@ -120,7 +127,7 @@ class SQSSupplierMessageBuilder(BrokerHttpMessageBuilder, SQSMessageBuilder):
         )
 
 
-class SupplierClientBase:
+class SupplierClientBase(HttpClientBase):
     """Base class for HTTP supplier clients.
 
     This class describes common attributes and methods for HTTP supplier clients.
@@ -140,17 +147,10 @@ class SupplierClientBase:
         message, extra = super().response_log(response, details)
         header, body = message.split(":", maxsplit=1)
 
-        if self.request_log_config.supplier_code:
+        if self.response_log_config.supplier_code:
             extra["supplier_code"] = details["supplier_code"]
 
         return f"{header} from [{details['supplier_label']}] supplier:{body}", extra
-
-    """A wrapper around the HTTPX `Client`, designed to streamline and extend its functionality to meet our needs.
-
-    This client provides an intuitive and extended interface for executing synchronous HTTP requests while maintaining
-    the core capabilities of the HTTPX `Client`. It is not a complete wrapper around HTTPX that would allow for
-    replacing HTTPX with another library. Instead, it simply extends the HTTPX `Client` with the features we need.
-    """
 
 
 class SupplierClient(SupplierClientBase, HttpClient):
