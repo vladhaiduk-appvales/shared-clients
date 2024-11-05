@@ -33,7 +33,7 @@ def sample_request() -> EnhancedRequest:
 
 @pytest.fixture
 def sample_response(sample_request: EnhancedRequest) -> EnhancedResponse:
-    response = Response(200, request=sample_request._request)
+    response = Response(200, request=sample_request.origin)
     response._elapsed = dt.timedelta(seconds=1)
     return EnhancedResponse(response)
 

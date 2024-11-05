@@ -6,11 +6,13 @@ from typing import TYPE_CHECKING
 import pytest
 
 from clients.broker.sqs import SQSMessageBuilder
-from clients.http.base import BrokerHttpMessageBuilder, HttpClientBase
+from clients.http.base import AsyncHttpClient, BrokerHttpMessageBuilder, HttpClient, HttpClientBase
 from clients.http.request import EnhancedRequest, Request
 from clients.http.response import EnhancedResponse, Response
 from clients.http.supplier import (
+    AsyncSupplierClient,
     SQSSupplierMessageBuilder,
+    SupplierClient,
     SupplierClientBase,
     SupplierRequestLogConfig,
     SupplierResponseLogConfig,
@@ -27,7 +29,7 @@ def sample_request() -> EnhancedRequest:
 
 @pytest.fixture
 def sample_response(sample_request: EnhancedRequest) -> EnhancedResponse:
-    response = Response(200, request=sample_request._request)
+    response = Response(200, request=sample_request.origin)
     response._elapsed = dt.timedelta(seconds=1)
     return EnhancedResponse(response)
 
@@ -299,3 +301,19 @@ class TestSupplierClientBase:
         assert "200" in message
 
         assert extra == expected_extra
+
+
+class TestSupplierClient:
+    def test_inherits_supplier_client_base(self) -> None:
+        assert issubclass(SupplierClient, SupplierClientBase)
+
+    def test_inherits_http_client(self) -> None:
+        assert issubclass(SupplierClient, HttpClient)
+
+
+class TestAsyncSupplierClient:
+    def test_inherits_supplier_client_base(self) -> None:
+        assert issubclass(AsyncSupplierClient, SupplierClientBase)
+
+    def test_inherits_async_http_client(self) -> None:
+        assert issubclass(AsyncSupplierClient, AsyncHttpClient)
