@@ -3,11 +3,12 @@ from __future__ import annotations
 import datetime as dt
 import logging
 from typing import TYPE_CHECKING, Any
+from unittest.mock import AsyncMock, MagicMock
 
 import httpx
 import pytest
 
-from clients.broker.base import BrokerMessageBuilder
+from clients.broker.base import AsyncBrokerClient, BrokerClient, BrokerMessageBuilder
 from clients.http.base import (
     AsyncHttpClient,
     AsyncHttpRetryStrategy,
@@ -21,8 +22,13 @@ from clients.http.base import (
 from clients.http.request import EnhancedRequest, Request
 from clients.http.response import EnhancedResponse, Response
 from retry.base import AsyncRetryStrategy, RetryError, RetryState, RetryStrategy
+from utils.unset import UNSET
 
 if TYPE_CHECKING:
+    from collections.abc import Generator
+
+    from pytest_mock import MockerFixture
+
     from clients.http.types_ import DetailsType
 
 
@@ -506,10 +512,987 @@ class TestHttpClientBase:
 
 
 class TestHttpClient:
+    @pytest.fixture(autouse=True)
+    def reset_class_attributes(self) -> Generator[None, None, None]:
+        yield
+
+        HttpClient.base_url = ""
+        HttpClient.base_params = None
+        HttpClient.base_headers = None
+        HttpClient.cookies = None
+        HttpClient.auth = None
+        HttpClient.proxy = None
+        HttpClient.cert = None
+        HttpClient.timeout = 5.0
+
+        HttpClient.retry_strategy = None
+        HttpClient.request_log_config = HttpRequestLogConfig()
+        HttpClient.response_log_config = HttpResponseLogConfig()
+        HttpClient.broker_client = None
+        HttpClient.broker_message_builder = None
+
+        HttpClient._global_client = None
+
+    @pytest.fixture
+    def mock_httpx_client(self, mocker: MockerFixture) -> MockerFixture:
+        return mocker.patch("httpx.Client")
+
     def test_inherits_http_client_base(self) -> None:
         assert issubclass(HttpClient, HttpClientBase)
 
+    def test_default_class_attributes(self) -> None:
+        assert HttpClient.base_url == ""
+        assert HttpClient.base_params is None
+        assert HttpClient.base_headers is None
+        assert HttpClient.cookies is None
+        assert HttpClient.auth is None
+        assert HttpClient.proxy is None
+        assert HttpClient.cert is None
+        assert HttpClient.timeout == 5.0
+
+        assert HttpClient.retry_strategy is None
+        assert HttpClient.request_log_config == HttpRequestLogConfig()
+        assert HttpClient.response_log_config == HttpResponseLogConfig()
+        assert HttpClient.broker_client is None
+        assert HttpClient.broker_message_builder is None
+
+        assert HttpClient._global_client is None
+
+    def test_configure_sets_only_specified_class_attributes(self) -> None:
+        HttpClient.configure(
+            base_params={"class_param": "value"},
+            base_headers={"class_header": "value"},
+            cookies={"class_cookie": "value"},
+        )
+
+        assert HttpClient.base_url == ""
+        assert HttpClient.base_params == {"class_param": "value"}
+        assert HttpClient.base_headers == {"class_header": "value"}
+        assert HttpClient.cookies == {"class_cookie": "value"}
+        assert HttpClient.auth is None
+        assert HttpClient.proxy is None
+        assert HttpClient.cert is None
+        assert HttpClient.timeout == 5.0
+
+        assert HttpClient.retry_strategy is None
+        assert HttpClient.request_log_config == HttpRequestLogConfig()
+        assert HttpClient.response_log_config == HttpResponseLogConfig()
+        assert HttpClient.broker_client is None
+        assert HttpClient.broker_message_builder is None
+
+        assert HttpClient._global_client is None
+
+    def test_init_sets_only_specified_instance_attributes(self) -> None:
+        client = HttpClient(
+            base_params={"instance_param": "value"},
+            base_headers={"instance_header": "value"},
+            cookies={"instance_cookie": "value"},
+        )
+
+        assert client.base_url == ""
+        assert client.base_params == {"instance_param": "value"}
+        assert client.base_headers == {"instance_header": "value"}
+        assert client.cookies == {"instance_cookie": "value"}
+        assert client.auth is None
+        assert client.proxy is None
+        assert client.cert is None
+        assert client.timeout == 5.0
+
+        assert client.retry_strategy is None
+        assert client.request_log_config == HttpRequestLogConfig()
+        assert client.response_log_config == HttpResponseLogConfig()
+        assert client.broker_client is None
+        assert client.broker_message_builder is None
+
+        assert client._global_client is None
+        assert client._local_client is None
+
+    def test_open_global_unopened_sets_global_client(self, mock_httpx_client: MagicMock) -> None:
+        HttpClient.open_global()
+
+        assert HttpClient._global_client is not None
+        mock_httpx_client.assert_called_once_with(
+            base_url=HttpClient.base_url,
+            params=HttpClient.base_params,
+            headers=HttpClient.base_headers,
+            cookies=HttpClient.cookies,
+            auth=HttpClient.auth,
+            proxy=HttpClient.proxy,
+            cert=HttpClient.cert,
+            timeout=HttpClient.timeout,
+        )
+
+    def test_open_global_opened_does_not_set_global_client(self, mock_httpx_client: MagicMock) -> None:
+        HttpClient.open_global()
+        HttpClient.open_global()
+
+        assert HttpClient._global_client is not None
+        mock_httpx_client.assert_called_once_with(
+            base_url=HttpClient.base_url,
+            params=HttpClient.base_params,
+            headers=HttpClient.base_headers,
+            cookies=HttpClient.cookies,
+            auth=HttpClient.auth,
+            proxy=HttpClient.proxy,
+            cert=HttpClient.cert,
+            timeout=HttpClient.timeout,
+        )
+
+    def test_close_global_opened_closes_global_client(self, mock_httpx_client: MagicMock) -> None:
+        HttpClient.open_global()
+        HttpClient.close_global()
+
+        assert HttpClient._global_client is not None
+        mock_httpx_client.return_value.close.assert_called_once()
+
+    def test_close_global_unopened_does_not_close_global_client(self, mock_httpx_client: MagicMock) -> None:
+        HttpClient.close_global()
+
+        assert HttpClient._global_client is None
+        mock_httpx_client.return_value.close.assert_not_called()
+
+    def test_open_unopened_sets_local_client(self, mock_httpx_client: MagicMock) -> None:
+        client = HttpClient()
+        client.open()
+
+        assert client._local_client is not None
+        mock_httpx_client.assert_called_once_with(
+            base_url=client.base_url,
+            params=client.base_params,
+            headers=client.base_headers,
+            cookies=client.cookies,
+            auth=client.auth,
+            proxy=client.proxy,
+            cert=client.cert,
+            timeout=client.timeout,
+        )
+
+    def test_open_opened_does_not_set_local_client(self, mock_httpx_client: MagicMock) -> None:
+        client = HttpClient()
+        client.open()
+        client.open()
+
+        assert client._local_client is not None
+        mock_httpx_client.assert_called_once_with(
+            base_url=client.base_url,
+            params=client.base_params,
+            headers=client.base_headers,
+            cookies=client.cookies,
+            auth=client.auth,
+            proxy=client.proxy,
+            cert=client.cert,
+            timeout=client.timeout,
+        )
+
+    def test_close_opened_closes_local_client(self, mock_httpx_client: MagicMock) -> None:
+        client = HttpClient()
+        client.open()
+        client.close()
+
+        assert client._local_client is not None
+        mock_httpx_client.return_value.close.assert_called_once()
+
+    def test_close_unopened_does_not_close_local_client(self, mock_httpx_client: MagicMock) -> None:
+        client = HttpClient()
+        client.close()
+
+        assert client._local_client is None
+        mock_httpx_client.return_value.close.assert_not_called()
+
+    def test_client_property_returns_global_client(self) -> None:
+        client = HttpClient()
+        HttpClient.open_global()
+
+        assert client._client is HttpClient._global_client
+
+    def test_client_property_returns_local_client(self) -> None:
+        client = HttpClient()
+        client.open()
+
+        assert client._client is client._local_client
+
+    def test_client_property_returns_local_client_over_global_client(self) -> None:
+        client = HttpClient()
+        HttpClient.open_global()
+        client.open()
+
+        assert client._client is client._local_client
+
+    def test_client_property_opens_local_client_and_returns_it(self, mock_httpx_client: MagicMock) -> None:
+        client = HttpClient()
+
+        assert client._client is client._local_client
+        mock_httpx_client.assert_called_once_with(
+            base_url=client.base_url,
+            params=client.base_params,
+            headers=client.base_headers,
+            cookies=client.cookies,
+            auth=client.auth,
+            proxy=client.proxy,
+            cert=client.cert,
+            timeout=client.timeout,
+        )
+
+    def test_enter_opens_local_client_and_returns_self(self, mock_httpx_client: MagicMock) -> None:
+        client = HttpClient()
+
+        assert client.__enter__() is client
+        assert client._local_client is not None
+
+        mock_httpx_client.assert_called_once_with(
+            base_url=client.base_url,
+            params=client.base_params,
+            headers=client.base_headers,
+            cookies=client.cookies,
+            auth=client.auth,
+            proxy=client.proxy,
+            cert=client.cert,
+            timeout=client.timeout,
+        )
+        mock_httpx_client.return_value.__enter__.assert_called_once()
+
+    def test_exit_closes_local_client(self, mock_httpx_client: MagicMock) -> None:
+        client = HttpClient()
+        client.__enter__()
+        client.__exit__(None, None, None)
+
+        assert client._local_client is not None
+
+        mock_httpx_client.return_value.__exit__.assert_called_once()
+        mock_httpx_client.return_value.close.assert_called_once()
+
+    def test_send_request_sends_request_and_returns_response(
+        self, mocker: MockerFixture, mock_httpx_client: MagicMock
+    ) -> None:
+        spy_request_log = mocker.spy(HttpClient, "request_log")
+        spy_response_log = mocker.spy(HttpClient, "response_log")
+
+        original_request = Request("GET", "http://example.com")
+        request = EnhancedRequest(original_request)
+        details = {
+            "request_name": "REQUEST",
+            "request_tag": "TEST",
+            "request_label": "REQUEST-TEST",
+        }
+
+        original_response = Response(200, request=original_request)
+        original_response.elapsed = dt.timedelta(seconds=1)
+        mock_httpx_client.return_value.send.return_value = original_response
+
+        with HttpClient() as client:
+            response = client._send_request(request, details=details)
+
+        assert isinstance(response, EnhancedResponse)
+        assert response.origin is original_response
+
+        mock_httpx_client.return_value.send.assert_called_once_with(original_request, auth=None)
+        spy_request_log.assert_called_once_with(client, request, details)
+        spy_response_log.assert_called_once_with(client, response, details)
+
+    def test_request_sends_request_and_returns_response(self, mock_httpx_client: MagicMock) -> None:
+        original_request = Request("GET", "http://example.com")
+        original_response = Response(200, request=original_request)
+        original_response.elapsed = dt.timedelta(seconds=1)
+        mock_httpx_client.return_value.send.return_value = original_response
+
+        with HttpClient() as client:
+            response = client.request("GET", "http://example.com")
+
+        assert isinstance(response, EnhancedResponse)
+        assert response.origin is original_response
+
+    def test_request_with_retry_strategy_retries_send_request_and_returns_response(
+        self, mocker: MockerFixture, mock_httpx_client: MagicMock
+    ) -> None:
+        original_request = Request("GET", "http://example.com")
+        original_response = Response(200, request=original_request)
+        original_response.elapsed = dt.timedelta(seconds=1)
+        mock_httpx_client.return_value.send.return_value = original_response
+
+        with HttpClient(retry_strategy=HttpRetryStrategy(attempts=3)) as client:
+            spy_retry_strategy_retry = mocker.spy(client.retry_strategy, "retry")
+            response = client.request("GET", "http://example.com")
+
+        assert isinstance(response, EnhancedResponse)
+        assert response.origin is original_response
+
+        spy_retry_strategy_retry.assert_called_once()
+
+    def test_request_with_broker_client_sends_message_to_broker_and_returns_response(
+        self, mock_httpx_client: MagicMock
+    ) -> None:
+        original_request = Request("GET", "http://example.com")
+        original_response = Response(200, request=original_request)
+        original_response.elapsed = dt.timedelta(seconds=1)
+        mock_httpx_client.return_value.send.return_value = original_response
+
+        mock_broker_client = MagicMock(spec=BrokerClient)
+        mock_broker_message_builder = MagicMock(spec=BrokerHttpMessageBuilder)
+        mock_broker_message_builder.build.return_value = "message"
+
+        with HttpClient(broker_client=mock_broker_client, broker_message_builder=mock_broker_message_builder) as client:
+            response = client.request("GET", "http://example.com")
+
+        assert isinstance(response, EnhancedResponse)
+        assert response.origin is original_response
+
+        mock_broker_message_builder.build.assert_called_once()
+        mock_broker_client.send_message.assert_called_once_with(message="message")
+
+    def test_get_sends_get_request_and_returns_response(
+        self, mocker: MockerFixture, mock_httpx_client: MagicMock
+    ) -> None:
+        spy_request = mocker.spy(HttpClient, "request")
+
+        original_request = Request("GET", "http://example.com")
+        original_response = Response(200, request=original_request)
+        original_response.elapsed = dt.timedelta(seconds=1)
+        mock_httpx_client.return_value.send.return_value = original_response
+
+        with HttpClient() as client:
+            response = client.get("http://example.com")
+
+        assert isinstance(response, EnhancedResponse)
+        assert response.origin is original_response
+
+        spy_request.assert_called_once_with(
+            client,
+            "GET",
+            "http://example.com",
+            name=None,
+            tag=None,
+            params=None,
+            headers=None,
+            auth=UNSET,
+            timeout=UNSET,
+            retry_strategy=UNSET,
+            details=None,
+        )
+
+    def test_post_sends_post_request_and_returns_response(
+        self, mocker: MockerFixture, mock_httpx_client: MagicMock
+    ) -> None:
+        spy_request = mocker.spy(HttpClient, "request")
+
+        original_request = Request("POST", "http://example.com")
+        original_response = Response(200, request=original_request)
+        original_response.elapsed = dt.timedelta(seconds=1)
+        mock_httpx_client.return_value.send.return_value = original_response
+
+        with HttpClient() as client:
+            response = client.post("http://example.com")
+
+        assert isinstance(response, EnhancedResponse)
+        assert response.origin is original_response
+
+        spy_request.assert_called_once_with(
+            client,
+            "POST",
+            "http://example.com",
+            name=None,
+            tag=None,
+            params=None,
+            headers=None,
+            content=None,
+            json=None,
+            auth=UNSET,
+            timeout=UNSET,
+            retry_strategy=UNSET,
+            details=None,
+        )
+
+    def test_put_sends_put_request_and_returns_response(
+        self, mocker: MockerFixture, mock_httpx_client: MagicMock
+    ) -> None:
+        spy_request = mocker.spy(HttpClient, "request")
+
+        original_request = Request("PUT", "http://example.com")
+        original_response = Response(200, request=original_request)
+        original_response.elapsed = dt.timedelta(seconds=1)
+        mock_httpx_client.return_value.send.return_value = original_response
+
+        with HttpClient() as client:
+            response = client.put("http://example.com")
+
+        assert isinstance(response, EnhancedResponse)
+        assert response.origin is original_response
+
+        spy_request.assert_called_once_with(
+            client,
+            "PUT",
+            "http://example.com",
+            name=None,
+            tag=None,
+            params=None,
+            headers=None,
+            content=None,
+            json=None,
+            auth=UNSET,
+            timeout=UNSET,
+            retry_strategy=UNSET,
+            details=None,
+        )
+
+    def test_patch_sends_patch_request_and_returns_response(
+        self, mocker: MockerFixture, mock_httpx_client: MagicMock
+    ) -> None:
+        spy_request = mocker.spy(HttpClient, "request")
+
+        original_request = Request("PATCH", "http://example.com")
+        original_response = Response(200, request=original_request)
+        original_response.elapsed = dt.timedelta(seconds=1)
+        mock_httpx_client.return_value.send.return_value = original_response
+
+        with HttpClient() as client:
+            response = client.patch("http://example.com")
+
+        assert isinstance(response, EnhancedResponse)
+        assert response.origin is original_response
+
+        spy_request.assert_called_once_with(
+            client,
+            "PATCH",
+            "http://example.com",
+            name=None,
+            tag=None,
+            params=None,
+            headers=None,
+            content=None,
+            json=None,
+            auth=UNSET,
+            timeout=UNSET,
+            retry_strategy=UNSET,
+            details=None,
+        )
+
+    def test_delete_sends_delete_request_and_returns_response(
+        self, mocker: MockerFixture, mock_httpx_client: MagicMock
+    ) -> None:
+        spy_request = mocker.spy(HttpClient, "request")
+
+        original_request = Request("DELETE", "http://example.com")
+        original_response = Response(200, request=original_request)
+        original_response.elapsed = dt.timedelta(seconds=1)
+        mock_httpx_client.return_value.send.return_value = original_response
+
+        with HttpClient() as client:
+            response = client.delete("http://example.com")
+
+        assert isinstance(response, EnhancedResponse)
+        assert response.origin is original_response
+
+        spy_request.assert_called_once_with(
+            client,
+            "DELETE",
+            "http://example.com",
+            name=None,
+            tag=None,
+            params=None,
+            headers=None,
+            auth=UNSET,
+            timeout=UNSET,
+            retry_strategy=UNSET,
+            details=None,
+        )
+
 
 class TestAsyncHttpClient:
+    @pytest.fixture(autouse=True)
+    def reset_class_attributes(self) -> Generator[None, None, None]:
+        yield
+
+        AsyncHttpClient.base_url = ""
+        AsyncHttpClient.base_params = None
+        AsyncHttpClient.base_headers = None
+        AsyncHttpClient.cookies = None
+        AsyncHttpClient.auth = None
+        AsyncHttpClient.proxy = None
+        AsyncHttpClient.cert = None
+        AsyncHttpClient.timeout = 5.0
+
+        AsyncHttpClient.retry_strategy = None
+        AsyncHttpClient.request_log_config = HttpRequestLogConfig()
+        AsyncHttpClient.response_log_config = HttpResponseLogConfig()
+        AsyncHttpClient.broker_client = None
+        AsyncHttpClient.broker_message_builder = None
+
+        AsyncHttpClient._global_client = None
+
+    @pytest.fixture
+    def mock_httpx_async_client(self, mocker: MockerFixture) -> MockerFixture:
+        return mocker.patch("httpx.AsyncClient", return_value=AsyncMock(spec=httpx.AsyncClient))
+
     def test_inherits_http_client_base(self) -> None:
         assert issubclass(AsyncHttpClient, HttpClientBase)
+
+    def test_default_class_attributes(self) -> None:
+        assert AsyncHttpClient.base_url == ""
+        assert AsyncHttpClient.base_params is None
+        assert AsyncHttpClient.base_headers is None
+        assert AsyncHttpClient.cookies is None
+        assert AsyncHttpClient.auth is None
+        assert AsyncHttpClient.proxy is None
+        assert AsyncHttpClient.cert is None
+        assert AsyncHttpClient.timeout == 5.0
+
+        assert AsyncHttpClient.retry_strategy is None
+        assert AsyncHttpClient.request_log_config == HttpRequestLogConfig()
+        assert AsyncHttpClient.response_log_config == HttpResponseLogConfig()
+        assert AsyncHttpClient.broker_client is None
+        assert AsyncHttpClient.broker_message_builder is None
+
+        assert AsyncHttpClient._global_client is None
+
+    def test_configure_sets_only_specified_class_attributes(self) -> None:
+        AsyncHttpClient.configure(
+            base_params={"class_param": "value"},
+            base_headers={"class_header": "value"},
+            cookies={"class_cookie": "value"},
+        )
+
+        assert AsyncHttpClient.base_url == ""
+        assert AsyncHttpClient.base_params == {"class_param": "value"}
+        assert AsyncHttpClient.base_headers == {"class_header": "value"}
+        assert AsyncHttpClient.cookies == {"class_cookie": "value"}
+        assert AsyncHttpClient.auth is None
+        assert AsyncHttpClient.proxy is None
+        assert AsyncHttpClient.cert is None
+        assert AsyncHttpClient.timeout == 5.0
+
+        assert AsyncHttpClient.retry_strategy is None
+        assert AsyncHttpClient.request_log_config == HttpRequestLogConfig()
+        assert AsyncHttpClient.response_log_config == HttpResponseLogConfig()
+        assert AsyncHttpClient.broker_client is None
+        assert AsyncHttpClient.broker_message_builder is None
+
+        assert AsyncHttpClient._global_client is None
+
+    def test_init_sets_only_specified_instance_attributes(self) -> None:
+        client = AsyncHttpClient(
+            base_params={"instance_param": "value"},
+            base_headers={"instance_header": "value"},
+            cookies={"instance_cookie": "value"},
+        )
+
+        assert client.base_url == ""
+        assert client.base_params == {"instance_param": "value"}
+        assert client.base_headers == {"instance_header": "value"}
+        assert client.cookies == {"instance_cookie": "value"}
+        assert client.auth is None
+        assert client.proxy is None
+        assert client.cert is None
+        assert client.timeout == 5.0
+
+        assert client.retry_strategy is None
+        assert client.request_log_config == HttpRequestLogConfig()
+        assert client.response_log_config == HttpResponseLogConfig()
+        assert client.broker_client is None
+        assert client.broker_message_builder is None
+
+        assert client._global_client is None
+        assert client._local_client is None
+
+    def test_open_global_unopened_sets_global_client(self, mock_httpx_async_client: MagicMock) -> None:
+        AsyncHttpClient.open_global()
+
+        assert AsyncHttpClient._global_client is not None
+        mock_httpx_async_client.assert_called_once_with(
+            base_url=AsyncHttpClient.base_url,
+            params=AsyncHttpClient.base_params,
+            headers=AsyncHttpClient.base_headers,
+            cookies=AsyncHttpClient.cookies,
+            auth=AsyncHttpClient.auth,
+            proxy=AsyncHttpClient.proxy,
+            cert=AsyncHttpClient.cert,
+            timeout=AsyncHttpClient.timeout,
+        )
+
+    def test_open_global_opened_does_not_set_global_client(self, mock_httpx_async_client: MagicMock) -> None:
+        AsyncHttpClient.open_global()
+        AsyncHttpClient.open_global()
+
+        assert AsyncHttpClient._global_client is not None
+        mock_httpx_async_client.assert_called_once_with(
+            base_url=AsyncHttpClient.base_url,
+            params=AsyncHttpClient.base_params,
+            headers=AsyncHttpClient.base_headers,
+            cookies=AsyncHttpClient.cookies,
+            auth=AsyncHttpClient.auth,
+            proxy=AsyncHttpClient.proxy,
+            cert=AsyncHttpClient.cert,
+            timeout=AsyncHttpClient.timeout,
+        )
+
+    @pytest.mark.asyncio
+    async def test_close_global_opened_closes_global_client(self, mock_httpx_async_client: MagicMock) -> None:
+        AsyncHttpClient.open_global()
+        await AsyncHttpClient.close_global()
+
+        assert AsyncHttpClient._global_client is not None
+        mock_httpx_async_client.return_value.aclose.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_close_global_unopened_does_not_close_global_client(self, mock_httpx_async_client: MagicMock) -> None:
+        await AsyncHttpClient.close_global()
+
+        assert AsyncHttpClient._global_client is None
+        mock_httpx_async_client.return_value.aclose.assert_not_called()
+
+    def test_open_unopened_sets_local_client(self, mock_httpx_async_client: MagicMock) -> None:
+        client = AsyncHttpClient()
+        client.open()
+
+        assert client._local_client is not None
+        mock_httpx_async_client.assert_called_once_with(
+            base_url=client.base_url,
+            params=client.base_params,
+            headers=client.base_headers,
+            cookies=client.cookies,
+            auth=client.auth,
+            proxy=client.proxy,
+            cert=client.cert,
+            timeout=client.timeout,
+        )
+
+    def test_open_opened_does_not_set_local_client(self, mock_httpx_async_client: MagicMock) -> None:
+        client = AsyncHttpClient()
+        client.open()
+        client.open()
+
+        assert client._local_client is not None
+        mock_httpx_async_client.assert_called_once_with(
+            base_url=client.base_url,
+            params=client.base_params,
+            headers=client.base_headers,
+            cookies=client.cookies,
+            auth=client.auth,
+            proxy=client.proxy,
+            cert=client.cert,
+            timeout=client.timeout,
+        )
+
+    @pytest.mark.asyncio
+    async def test_close_opened_closes_local_client(self, mock_httpx_async_client: MagicMock) -> None:
+        client = AsyncHttpClient()
+        client.open()
+        await client.close()
+
+        assert client._local_client is not None
+        mock_httpx_async_client.return_value.aclose.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_close_unopened_does_not_close_local_client(self, mock_httpx_async_client: MagicMock) -> None:
+        client = AsyncHttpClient()
+        await client.close()
+
+        assert client._local_client is None
+        mock_httpx_async_client.return_value.aclose.assert_not_called()
+
+    def test_client_property_returns_global_client(self) -> None:
+        client = AsyncHttpClient()
+        AsyncHttpClient.open_global()
+
+        assert client._client is AsyncHttpClient._global_client
+
+    def test_client_property_returns_local_client(self) -> None:
+        client = AsyncHttpClient()
+        client.open()
+
+        assert client._client is client._local_client
+
+    def test_client_property_returns_local_client_over_global_client(self) -> None:
+        client = AsyncHttpClient()
+        AsyncHttpClient.open_global()
+        client.open()
+
+        assert client._client is client._local_client
+
+    def test_client_property_opens_local_client_and_returns_it(self, mock_httpx_async_client: MagicMock) -> None:
+        client = AsyncHttpClient()
+
+        assert client._client is client._local_client
+        mock_httpx_async_client.assert_called_once_with(
+            base_url=client.base_url,
+            params=client.base_params,
+            headers=client.base_headers,
+            cookies=client.cookies,
+            auth=client.auth,
+            proxy=client.proxy,
+            cert=client.cert,
+            timeout=client.timeout,
+        )
+
+    @pytest.mark.asyncio
+    async def test_aenter_opens_local_client_and_returns_self(self, mock_httpx_async_client: MagicMock) -> None:
+        client = AsyncHttpClient()
+
+        assert await client.__aenter__() is client
+        assert client._local_client is not None
+
+        mock_httpx_async_client.assert_called_once_with(
+            base_url=client.base_url,
+            params=client.base_params,
+            headers=client.base_headers,
+            cookies=client.cookies,
+            auth=client.auth,
+            proxy=client.proxy,
+            cert=client.cert,
+            timeout=client.timeout,
+        )
+        mock_httpx_async_client.return_value.__aenter__.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_aexit_closes_local_client(self, mock_httpx_async_client: MagicMock) -> None:
+        client = AsyncHttpClient()
+        await client.__aenter__()
+        await client.__aexit__(None, None, None)
+
+        assert client._local_client is not None
+
+        mock_httpx_async_client.return_value.__aexit__.assert_called_once()
+        mock_httpx_async_client.return_value.aclose.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_send_request_sends_request_and_returns_response(
+        self, mocker: MockerFixture, mock_httpx_async_client: MagicMock
+    ) -> None:
+        spy_request_log = mocker.spy(AsyncHttpClient, "request_log")
+        spy_response_log = mocker.spy(AsyncHttpClient, "response_log")
+
+        original_request = Request("GET", "http://example.com")
+        request = EnhancedRequest(original_request)
+        details = {
+            "request_name": "REQUEST",
+            "request_tag": "TEST",
+            "request_label": "REQUEST-TEST",
+        }
+
+        original_response = Response(200, request=original_request)
+        original_response.elapsed = dt.timedelta(seconds=1)
+        mock_httpx_async_client.return_value.send.return_value = original_response
+
+        async with AsyncHttpClient() as client:
+            response = await client._send_request(request, details=details)
+
+        assert isinstance(response, EnhancedResponse)
+        assert response.origin is original_response
+
+        mock_httpx_async_client.return_value.send.assert_called_once_with(original_request, auth=None)
+        spy_request_log.assert_called_once_with(client, request, details)
+        spy_response_log.assert_called_once_with(client, response, details)
+
+    @pytest.mark.asyncio
+    async def test_request_sends_request_and_returns_response(self, mock_httpx_async_client: MagicMock) -> None:
+        original_request = Request("GET", "http://example.com")
+        original_response = Response(200, request=original_request)
+        original_response.elapsed = dt.timedelta(seconds=1)
+        mock_httpx_async_client.return_value.send.return_value = original_response
+
+        async with AsyncHttpClient() as client:
+            response = await client.request("GET", "http://example.com")
+
+        assert isinstance(response, EnhancedResponse)
+        assert response.origin is original_response
+
+    @pytest.mark.asyncio
+    async def test_request_with_retry_strategy_retries_send_request_and_returns_response(
+        self, mocker: MockerFixture, mock_httpx_async_client: MagicMock
+    ) -> None:
+        original_request = Request("GET", "http://example.com")
+        original_response = Response(200, request=original_request)
+        original_response.elapsed = dt.timedelta(seconds=1)
+        mock_httpx_async_client.return_value.send.return_value = original_response
+
+        async with AsyncHttpClient(retry_strategy=AsyncHttpRetryStrategy(attempts=3)) as client:
+            spy_retry_strategy_retry = mocker.spy(client.retry_strategy, "retry")
+            response = await client.request("GET", "http://example.com")
+
+        assert isinstance(response, EnhancedResponse)
+        assert response.origin is original_response
+
+        spy_retry_strategy_retry.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_request_with_broker_client_sends_message_to_broker_and_returns_response(
+        self, mock_httpx_async_client: MagicMock
+    ) -> None:
+        original_request = Request("GET", "http://example.com")
+        original_response = Response(200, request=original_request)
+        original_response.elapsed = dt.timedelta(seconds=1)
+        mock_httpx_async_client.return_value.send.return_value = original_response
+
+        mock_broker_client = AsyncMock(spec=AsyncBrokerClient)
+        mock_broker_message_builder = AsyncMock(spec=BrokerHttpMessageBuilder)
+        mock_broker_message_builder.build.return_value = "message"
+
+        async with AsyncHttpClient(
+            broker_client=mock_broker_client, broker_message_builder=mock_broker_message_builder
+        ) as client:
+            response = await client.request("GET", "http://example.com")
+
+        assert isinstance(response, EnhancedResponse)
+        assert response.origin is original_response
+
+        mock_broker_message_builder.build.assert_called_once()
+        mock_broker_client.send_message.assert_called_once_with(message="message")
+
+    @pytest.mark.asyncio
+    async def test_get_sends_get_request_and_returns_response(
+        self, mocker: MockerFixture, mock_httpx_async_client: MagicMock
+    ) -> None:
+        spy_request = mocker.spy(AsyncHttpClient, "request")
+
+        original_request = Request("GET", "http://example.com")
+        original_response = Response(200, request=original_request)
+        original_response.elapsed = dt.timedelta(seconds=1)
+        mock_httpx_async_client.return_value.send.return_value = original_response
+
+        async with AsyncHttpClient() as client:
+            response = await client.get("http://example.com")
+
+        assert isinstance(response, EnhancedResponse)
+        assert response.origin is original_response
+
+        spy_request.assert_called_once_with(
+            client,
+            "GET",
+            "http://example.com",
+            name=None,
+            tag=None,
+            params=None,
+            headers=None,
+            auth=UNSET,
+            timeout=UNSET,
+            retry_strategy=UNSET,
+            details=None,
+        )
+
+    @pytest.mark.asyncio
+    async def test_post_sends_post_request_and_returns_response(
+        self, mocker: MockerFixture, mock_httpx_async_client: MagicMock
+    ) -> None:
+        spy_request = mocker.spy(AsyncHttpClient, "request")
+
+        original_request = Request("POST", "http://example.com")
+        original_response = Response(200, request=original_request)
+        original_response.elapsed = dt.timedelta(seconds=1)
+        mock_httpx_async_client.return_value.send.return_value = original_response
+
+        async with AsyncHttpClient() as client:
+            response = await client.post("http://example.com")
+
+        assert isinstance(response, EnhancedResponse)
+        assert response.origin is original_response
+
+        spy_request.assert_called_once_with(
+            client,
+            "POST",
+            "http://example.com",
+            name=None,
+            tag=None,
+            params=None,
+            headers=None,
+            content=None,
+            json=None,
+            auth=UNSET,
+            timeout=UNSET,
+            retry_strategy=UNSET,
+            details=None,
+        )
+
+    @pytest.mark.asyncio
+    async def test_put_sends_put_request_and_returns_response(
+        self, mocker: MockerFixture, mock_httpx_async_client: MagicMock
+    ) -> None:
+        spy_request = mocker.spy(AsyncHttpClient, "request")
+
+        original_request = Request("PUT", "http://example.com")
+        original_response = Response(200, request=original_request)
+        original_response.elapsed = dt.timedelta(seconds=1)
+        mock_httpx_async_client.return_value.send.return_value = original_response
+
+        async with AsyncHttpClient() as client:
+            response = await client.put("http://example.com")
+
+        assert isinstance(response, EnhancedResponse)
+        assert response.origin is original_response
+
+        spy_request.assert_called_once_with(
+            client,
+            "PUT",
+            "http://example.com",
+            name=None,
+            tag=None,
+            params=None,
+            headers=None,
+            content=None,
+            json=None,
+            auth=UNSET,
+            timeout=UNSET,
+            retry_strategy=UNSET,
+            details=None,
+        )
+
+    @pytest.mark.asyncio
+    async def test_patch_sends_patch_request_and_returns_response(
+        self, mocker: MockerFixture, mock_httpx_async_client: MagicMock
+    ) -> None:
+        spy_request = mocker.spy(AsyncHttpClient, "request")
+
+        original_request = Request("PATCH", "http://example.com")
+        original_response = Response(200, request=original_request)
+        original_response.elapsed = dt.timedelta(seconds=1)
+        mock_httpx_async_client.return_value.send.return_value = original_response
+
+        async with AsyncHttpClient() as client:
+            response = await client.patch("http://example.com")
+
+        assert isinstance(response, EnhancedResponse)
+        assert response.origin is original_response
+
+        spy_request.assert_called_once_with(
+            client,
+            "PATCH",
+            "http://example.com",
+            name=None,
+            tag=None,
+            params=None,
+            headers=None,
+            content=None,
+            json=None,
+            auth=UNSET,
+            timeout=UNSET,
+            retry_strategy=UNSET,
+            details=None,
+        )
+
+    @pytest.mark.asyncio
+    async def test_delete_sends_delete_request_and_returns_response(
+        self, mocker: MockerFixture, mock_httpx_async_client: MagicMock
+    ) -> None:
+        spy_request = mocker.spy(AsyncHttpClient, "request")
+
+        original_request = Request("DELETE", "http://example.com")
+        original_response = Response(200, request=original_request)
+        original_response.elapsed = dt.timedelta(seconds=1)
+        mock_httpx_async_client.return_value.send.return_value = original_response
+
+        async with AsyncHttpClient() as client:
+            response = await client.delete("http://example.com")
+
+        assert isinstance(response, EnhancedResponse)
+        assert response.origin is original_response
+
+        spy_request.assert_called_once_with(
+            client,
+            "DELETE",
+            "http://example.com",
+            name=None,
+            tag=None,
+            params=None,
+            headers=None,
+            auth=UNSET,
+            timeout=UNSET,
+            retry_strategy=UNSET,
+            details=None,
+        )
