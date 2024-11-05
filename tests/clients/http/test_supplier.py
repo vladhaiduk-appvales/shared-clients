@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import datetime as dt
 from typing import TYPE_CHECKING
+from unittest.mock import AsyncMock, MagicMock
 
+import httpx
 import pytest
+from ddtrace import tracer
 
 from clients.broker.sqs import SQSMessageBuilder
 from clients.http.base import AsyncHttpClient, BrokerHttpMessageBuilder, HttpClient, HttpClientBase
@@ -17,8 +20,13 @@ from clients.http.supplier import (
     SupplierRequestLogConfig,
     SupplierResponseLogConfig,
 )
+from utils.unset import UNSET
 
 if TYPE_CHECKING:
+    from collections.abc import Generator
+
+    from pytest_mock import MockerFixture
+
     from clients.http.types_ import DetailsType
 
 
@@ -304,16 +312,543 @@ class TestSupplierClientBase:
 
 
 class TestSupplierClient:
+    @pytest.fixture(autouse=True)
+    def reset_class_attributes(self) -> Generator[None, None, None]:
+        yield
+
+        SupplierClient.service_name = None
+        SupplierClient.supplier_code = None
+
+        SupplierClient.base_url = ""
+        SupplierClient.base_params = None
+        SupplierClient.base_headers = None
+        SupplierClient.cookies = None
+        SupplierClient.auth = None
+        SupplierClient.proxy = None
+        SupplierClient.cert = None
+        SupplierClient.timeout = 5.0
+
+        SupplierClient.retry_strategy = None
+        SupplierClient.request_log_config = SupplierRequestLogConfig()
+        SupplierClient.response_log_config = SupplierResponseLogConfig()
+        SupplierClient.broker_client = None
+        SupplierClient.broker_message_builder = None
+
+        SupplierClient._global_client = None
+
+    @pytest.fixture
+    def mock_httpx_client(self, mocker: MockerFixture) -> MockerFixture:
+        return mocker.patch("httpx.Client")
+
     def test_inherits_supplier_client_base(self) -> None:
         assert issubclass(SupplierClient, SupplierClientBase)
 
     def test_inherits_http_client(self) -> None:
         assert issubclass(SupplierClient, HttpClient)
 
+    def test_configure_sets_only_specified_class_attributes(self) -> None:
+        SupplierClient.configure(
+            base_params={"class_param": "value"},
+            base_headers={"class_header": "value"},
+            cookies={"class_cookie": "value"},
+        )
+
+        assert SupplierClient.service_name is None
+        assert SupplierClient.supplier_code is None
+
+        assert SupplierClient.base_url == ""
+        assert SupplierClient.base_params == {"class_param": "value"}
+        assert SupplierClient.base_headers == {"class_header": "value"}
+        assert SupplierClient.cookies == {"class_cookie": "value"}
+        assert SupplierClient.auth is None
+        assert SupplierClient.proxy is None
+        assert SupplierClient.cert is None
+        assert SupplierClient.timeout == 5.0
+
+        assert SupplierClient.retry_strategy is None
+        assert SupplierClient.request_log_config == SupplierRequestLogConfig()
+        assert SupplierClient.response_log_config == SupplierResponseLogConfig()
+        assert SupplierClient.broker_client is None
+        assert SupplierClient.broker_message_builder is None
+
+        assert SupplierClient._global_client is None
+
+    def test_init_sets_only_specified_instance_attributes(self) -> None:
+        client = SupplierClient(
+            base_params={"instance_param": "value"},
+            base_headers={"instance_header": "value"},
+            cookies={"instance_cookie": "value"},
+        )
+
+        assert client.service_name is None
+        assert client.supplier_code is None
+
+        assert client.base_url == ""
+        assert client.base_params == {"instance_param": "value"}
+        assert client.base_headers == {"instance_header": "value"}
+        assert client.cookies == {"instance_cookie": "value"}
+        assert client.auth is None
+        assert client.proxy is None
+        assert client.cert is None
+        assert client.timeout == 5.0
+
+        assert client.retry_strategy is None
+        assert client.request_log_config == SupplierRequestLogConfig()
+        assert client.response_log_config == SupplierResponseLogConfig()
+        assert client.broker_client is None
+        assert client.broker_message_builder is None
+
+        assert client._global_client is None
+        assert client._local_client is None
+
+    def test_request_sends_request_and_returns_response(
+        self, mocker: MockerFixture, mock_httpx_client: MagicMock
+    ) -> None:
+        spy_tracer_trace = mocker.spy(tracer, "trace")
+
+        original_request = Request("GET", "http://example.com")
+        original_response = Response(200, request=original_request)
+        original_response.elapsed = dt.timedelta(seconds=1)
+        mock_httpx_client.return_value.send.return_value = original_response
+
+        with SupplierClient() as client:
+            response = client.request("GET", "http://example.com")
+
+        assert isinstance(response, EnhancedResponse)
+        assert response.origin is original_response
+
+        spy_tracer_trace.assert_called_once()
+
+    def test_get_sends_get_request_and_returns_response(
+        self, mocker: MockerFixture, mock_httpx_client: MagicMock
+    ) -> None:
+        spy_request = mocker.spy(SupplierClient, "request")
+
+        original_request = Request("GET", "http://example.com")
+        original_response = Response(200, request=original_request)
+        original_response.elapsed = dt.timedelta(seconds=1)
+        mock_httpx_client.return_value.send.return_value = original_response
+
+        with SupplierClient() as client:
+            response = client.get("http://example.com")
+
+        assert isinstance(response, EnhancedResponse)
+        assert response.origin is original_response
+
+        spy_request.assert_called_once_with(
+            client,
+            "GET",
+            "http://example.com",
+            name=None,
+            tag=None,
+            supplier_code=UNSET,
+            params=None,
+            headers=None,
+            auth=UNSET,
+            timeout=UNSET,
+            retry_strategy=UNSET,
+            details=None,
+        )
+
+    def test_post_sends_post_request_and_returns_response(
+        self, mocker: MockerFixture, mock_httpx_client: MagicMock
+    ) -> None:
+        spy_request = mocker.spy(SupplierClient, "request")
+
+        original_request = Request("POST", "http://example.com")
+        original_response = Response(200, request=original_request)
+        original_response.elapsed = dt.timedelta(seconds=1)
+        mock_httpx_client.return_value.send.return_value = original_response
+
+        with SupplierClient() as client:
+            response = client.post("http://example.com")
+
+        assert isinstance(response, EnhancedResponse)
+        assert response.origin is original_response
+
+        spy_request.assert_called_once_with(
+            client,
+            "POST",
+            "http://example.com",
+            name=None,
+            tag=None,
+            supplier_code=UNSET,
+            params=None,
+            headers=None,
+            content=None,
+            json=None,
+            auth=UNSET,
+            timeout=UNSET,
+            retry_strategy=UNSET,
+            details=None,
+        )
+
+    def test_put_sends_put_request_and_returns_response(
+        self, mocker: MockerFixture, mock_httpx_client: MagicMock
+    ) -> None:
+        spy_request = mocker.spy(SupplierClient, "request")
+
+        original_request = Request("PUT", "http://example.com")
+        original_response = Response(200, request=original_request)
+        original_response.elapsed = dt.timedelta(seconds=1)
+        mock_httpx_client.return_value.send.return_value = original_response
+
+        with SupplierClient() as client:
+            response = client.put("http://example.com")
+
+        assert isinstance(response, EnhancedResponse)
+        assert response.origin is original_response
+
+        spy_request.assert_called_once_with(
+            client,
+            "PUT",
+            "http://example.com",
+            name=None,
+            tag=None,
+            supplier_code=UNSET,
+            params=None,
+            headers=None,
+            content=None,
+            json=None,
+            auth=UNSET,
+            timeout=UNSET,
+            retry_strategy=UNSET,
+            details=None,
+        )
+
+    def test_patch_sends_patch_request_and_returns_response(
+        self, mocker: MockerFixture, mock_httpx_client: MagicMock
+    ) -> None:
+        spy_request = mocker.spy(SupplierClient, "request")
+
+        original_request = Request("PATCH", "http://example.com")
+        original_response = Response(200, request=original_request)
+        original_response.elapsed = dt.timedelta(seconds=1)
+        mock_httpx_client.return_value.send.return_value = original_response
+
+        with SupplierClient() as client:
+            response = client.patch("http://example.com")
+
+        assert isinstance(response, EnhancedResponse)
+        assert response.origin is original_response
+
+        spy_request.assert_called_once_with(
+            client,
+            "PATCH",
+            "http://example.com",
+            name=None,
+            tag=None,
+            supplier_code=UNSET,
+            params=None,
+            headers=None,
+            content=None,
+            json=None,
+            auth=UNSET,
+            timeout=UNSET,
+            retry_strategy=UNSET,
+            details=None,
+        )
+
+    def test_delete_sends_delete_request_and_returns_response(
+        self, mocker: MockerFixture, mock_httpx_client: MagicMock
+    ) -> None:
+        spy_request = mocker.spy(SupplierClient, "request")
+
+        original_request = Request("DELETE", "http://example.com")
+        original_response = Response(200, request=original_request)
+        original_response.elapsed = dt.timedelta(seconds=1)
+        mock_httpx_client.return_value.send.return_value = original_response
+
+        with SupplierClient() as client:
+            response = client.delete("http://example.com")
+
+        assert isinstance(response, EnhancedResponse)
+        assert response.origin is original_response
+
+        spy_request.assert_called_once_with(
+            client,
+            "DELETE",
+            "http://example.com",
+            name=None,
+            tag=None,
+            supplier_code=UNSET,
+            params=None,
+            headers=None,
+            auth=UNSET,
+            timeout=UNSET,
+            retry_strategy=UNSET,
+            details=None,
+        )
+
 
 class TestAsyncSupplierClient:
+    @pytest.fixture(autouse=True)
+    def reset_class_attributes(self) -> Generator[None, None, None]:
+        yield
+
+        AsyncSupplierClient.base_url = ""
+        AsyncSupplierClient.base_params = None
+        AsyncSupplierClient.base_headers = None
+        AsyncSupplierClient.cookies = None
+        AsyncSupplierClient.auth = None
+        AsyncSupplierClient.proxy = None
+        AsyncSupplierClient.cert = None
+        AsyncSupplierClient.timeout = 5.0
+
+        AsyncSupplierClient.retry_strategy = None
+        AsyncSupplierClient.request_log_config = SupplierRequestLogConfig()
+        AsyncSupplierClient.response_log_config = SupplierResponseLogConfig()
+        AsyncSupplierClient.broker_client = None
+        AsyncSupplierClient.broker_message_builder = None
+
+        AsyncSupplierClient._global_client = None
+
+    @pytest.fixture
+    def mock_httpx_async_client(self, mocker: MockerFixture) -> MockerFixture:
+        return mocker.patch("httpx.AsyncClient", return_value=AsyncMock(spec=httpx.AsyncClient))
+
     def test_inherits_supplier_client_base(self) -> None:
         assert issubclass(AsyncSupplierClient, SupplierClientBase)
 
     def test_inherits_async_http_client(self) -> None:
         assert issubclass(AsyncSupplierClient, AsyncHttpClient)
+
+    def test_configure_sets_only_specified_class_attributes(self) -> None:
+        AsyncSupplierClient.configure(
+            base_params={"class_param": "value"},
+            base_headers={"class_header": "value"},
+            cookies={"class_cookie": "value"},
+        )
+
+        assert AsyncSupplierClient.service_name is None
+        assert AsyncSupplierClient.supplier_code is None
+
+        assert AsyncSupplierClient.base_url == ""
+        assert AsyncSupplierClient.base_params == {"class_param": "value"}
+        assert AsyncSupplierClient.base_headers == {"class_header": "value"}
+        assert AsyncSupplierClient.cookies == {"class_cookie": "value"}
+        assert AsyncSupplierClient.auth is None
+        assert AsyncSupplierClient.proxy is None
+        assert AsyncSupplierClient.cert is None
+        assert AsyncSupplierClient.timeout == 5.0
+
+        assert AsyncSupplierClient.retry_strategy is None
+        assert AsyncSupplierClient.request_log_config == SupplierRequestLogConfig()
+        assert AsyncSupplierClient.response_log_config == SupplierResponseLogConfig()
+        assert AsyncSupplierClient.broker_client is None
+        assert AsyncSupplierClient.broker_message_builder is None
+
+        assert AsyncSupplierClient._global_client is None
+
+    def test_init_sets_only_specified_instance_attributes(self) -> None:
+        client = AsyncSupplierClient(
+            base_params={"instance_param": "value"},
+            base_headers={"instance_header": "value"},
+            cookies={"instance_cookie": "value"},
+        )
+
+        assert client.service_name is None
+        assert client.supplier_code is None
+
+        assert client.base_url == ""
+        assert client.base_params == {"instance_param": "value"}
+        assert client.base_headers == {"instance_header": "value"}
+        assert client.cookies == {"instance_cookie": "value"}
+        assert client.auth is None
+        assert client.proxy is None
+        assert client.cert is None
+        assert client.timeout == 5.0
+
+        assert client.retry_strategy is None
+        assert client.request_log_config == SupplierRequestLogConfig()
+        assert client.response_log_config == SupplierResponseLogConfig()
+        assert client.broker_client is None
+        assert client.broker_message_builder is None
+
+        assert client._global_client is None
+        assert client._local_client is None
+
+    @pytest.mark.asyncio
+    async def test_request_sends_request_and_returns_response(
+        self, mocker: MockerFixture, mock_httpx_async_client: MagicMock
+    ) -> None:
+        spy_tracer_trace = mocker.spy(tracer, "trace")
+
+        original_request = Request("GET", "http://example.com")
+        original_response = Response(200, request=original_request)
+        original_response.elapsed = dt.timedelta(seconds=1)
+        mock_httpx_async_client.return_value.send.return_value = original_response
+
+        async with AsyncSupplierClient() as client:
+            response = await client.request("GET", "http://example.com")
+
+        assert isinstance(response, EnhancedResponse)
+        assert response.origin is original_response
+
+        spy_tracer_trace.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_get_sends_get_request_and_returns_response(
+        self, mocker: MockerFixture, mock_httpx_async_client: MagicMock
+    ) -> None:
+        spy_request = mocker.spy(AsyncSupplierClient, "request")
+
+        original_request = Request("GET", "http://example.com")
+        original_response = Response(200, request=original_request)
+        original_response.elapsed = dt.timedelta(seconds=1)
+        mock_httpx_async_client.return_value.send.return_value = original_response
+
+        async with AsyncSupplierClient() as client:
+            response = await client.get("http://example.com")
+
+        assert isinstance(response, EnhancedResponse)
+        assert response.origin is original_response
+
+        spy_request.assert_called_once_with(
+            client,
+            "GET",
+            "http://example.com",
+            name=None,
+            tag=None,
+            supplier_code=UNSET,
+            params=None,
+            headers=None,
+            auth=UNSET,
+            timeout=UNSET,
+            retry_strategy=UNSET,
+            details=None,
+        )
+
+    @pytest.mark.asyncio
+    async def test_post_sends_post_request_and_returns_response(
+        self, mocker: MockerFixture, mock_httpx_async_client: MagicMock
+    ) -> None:
+        spy_request = mocker.spy(AsyncSupplierClient, "request")
+
+        original_request = Request("POST", "http://example.com")
+        original_response = Response(200, request=original_request)
+        original_response.elapsed = dt.timedelta(seconds=1)
+        mock_httpx_async_client.return_value.send.return_value = original_response
+
+        async with AsyncSupplierClient() as client:
+            response = await client.post("http://example.com")
+
+        assert isinstance(response, EnhancedResponse)
+        assert response.origin is original_response
+
+        spy_request.assert_called_once_with(
+            client,
+            "POST",
+            "http://example.com",
+            name=None,
+            tag=None,
+            supplier_code=UNSET,
+            params=None,
+            headers=None,
+            content=None,
+            json=None,
+            auth=UNSET,
+            timeout=UNSET,
+            retry_strategy=UNSET,
+            details=None,
+        )
+
+    @pytest.mark.asyncio
+    async def test_put_sends_put_request_and_returns_response(
+        self, mocker: MockerFixture, mock_httpx_async_client: MagicMock
+    ) -> None:
+        spy_request = mocker.spy(AsyncSupplierClient, "request")
+
+        original_request = Request("PUT", "http://example.com")
+        original_response = Response(200, request=original_request)
+        original_response.elapsed = dt.timedelta(seconds=1)
+        mock_httpx_async_client.return_value.send.return_value = original_response
+
+        async with AsyncSupplierClient() as client:
+            response = await client.put("http://example.com")
+
+        assert isinstance(response, EnhancedResponse)
+        assert response.origin is original_response
+
+        spy_request.assert_called_once_with(
+            client,
+            "PUT",
+            "http://example.com",
+            name=None,
+            tag=None,
+            supplier_code=UNSET,
+            params=None,
+            headers=None,
+            content=None,
+            json=None,
+            auth=UNSET,
+            timeout=UNSET,
+            retry_strategy=UNSET,
+            details=None,
+        )
+
+    @pytest.mark.asyncio
+    async def test_patch_sends_patch_request_and_returns_response(
+        self, mocker: MockerFixture, mock_httpx_async_client: MagicMock
+    ) -> None:
+        spy_request = mocker.spy(AsyncSupplierClient, "request")
+
+        original_request = Request("PATCH", "http://example.com")
+        original_response = Response(200, request=original_request)
+        original_response.elapsed = dt.timedelta(seconds=1)
+        mock_httpx_async_client.return_value.send.return_value = original_response
+
+        async with AsyncSupplierClient() as client:
+            response = await client.patch("http://example.com")
+
+        assert isinstance(response, EnhancedResponse)
+        assert response.origin is original_response
+
+        spy_request.assert_called_once_with(
+            client,
+            "PATCH",
+            "http://example.com",
+            name=None,
+            tag=None,
+            supplier_code=UNSET,
+            params=None,
+            headers=None,
+            content=None,
+            json=None,
+            auth=UNSET,
+            timeout=UNSET,
+            retry_strategy=UNSET,
+            details=None,
+        )
+
+    @pytest.mark.asyncio
+    async def test_delete_sends_delete_request_and_returns_response(
+        self, mocker: MockerFixture, mock_httpx_async_client: MagicMock
+    ) -> None:
+        spy_request = mocker.spy(AsyncSupplierClient, "request")
+
+        original_request = Request("DELETE", "http://example.com")
+        original_response = Response(200, request=original_request)
+        original_response.elapsed = dt.timedelta(seconds=1)
+        mock_httpx_async_client.return_value.send.return_value = original_response
+
+        async with AsyncSupplierClient() as client:
+            response = await client.delete("http://example.com")
+
+        assert isinstance(response, EnhancedResponse)
+        assert response.origin is original_response
+
+        spy_request.assert_called_once_with(
+            client,
+            "DELETE",
+            "http://example.com",
+            name=None,
+            tag=None,
+            supplier_code=UNSET,
+            params=None,
+            headers=None,
+            auth=UNSET,
+            timeout=UNSET,
+            retry_strategy=UNSET,
+            details=None,
+        )
